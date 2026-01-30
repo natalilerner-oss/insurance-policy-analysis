@@ -658,3 +658,251 @@ def extract_policy_status(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse("Job not found", status_code=404)
 
     return func.HttpResponse(json.dumps(job, ensure_ascii=False), mimetype="application/json")
+
+
+# --------------------------------------------------------------------------- 
+# New routes for Office document extraction and translation
+# ---------------------------------------------------------------------------
+
+@app.route(route="extract", methods=["POST"])
+def extract(req: func.HttpRequest) -> func.HttpResponse:
+    _assign_request_id(req)
+    _logger.info("Extract route triggered")
+    ok, detail = _verify_jwt(req)
+    if not ok:
+        return _error_response("unauthorized", "Authorization failed", 401, details=detail)
+
+    filename: str | None = None
+    file_bytes: bytes | None = None
+
+    raw_body = req.get_body() or b""
+    if raw_body:
+        try:
+            body_json = json.loads(raw_body.decode("utf-8")) if raw_body.strip().startswith(b"{") else None
+        except Exception:
+            body_json = None
+    else:
+        body_json = None
+
+    if body_json:
+        blob_url = body_json.get("file-url") or body_json.get("blob_url")
+        container = body_json.get("container")
+        blob_name = body_json.get("blob_name")
+        if blob_url or blob_name:
+            try:
+                filename, file_bytes = _download_blob_bytes(blob_url=blob_url, container=container, blob_name=blob_name)
+            except ValueError as e:
+                detail_msg = str(e)
+                if detail_msg.startswith("blob_auth_failed"):
+                    return _error_response("unauthorized_blob", "Blob access unauthorized", 401, details=detail_msg)
+                err_key = "blob_download_failed" if detail_msg.startswith("blob_download_failed") else "bad_request"
+                return _error_response(err_key, "Failed to download blob", 400, details=detail_msg)
+
+    if not file_bytes:
+        # Parse multipart form using req.files if available
+        if not getattr(req, "files", None) or "file" not in req.files:
+            return _error_response("bad_request", "No 'file' field provided", 400, details={"available_form_fields": list(getattr(req, "form", {}).keys())})
+        file = req.files["file"]
+        filename = file.filename
+        file_bytes = file.read()
+
+    assert filename is not None and file_bytes is not None
+    if len(file_bytes) > MAX_CONTENT_LENGTH:
+        return _error_response("payload_too_large", f"File size exceeds limit of {MAX_CONTENT_LENGTH} bytes", 413)
+
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+    if ext not in {"pptx", "docx", "xlsx"}:
+        return _error_response("unsupported_media_type", "Only .pptx, .docx, .xlsx files are supported", 415)
+
+    if not file_bytes.startswith(b"PK\x03\x04"):
+        try:
+            decoded = base64.b64decode(file_bytes.strip(), validate=True)
+            if decoded.startswith(b"PK\x03\x04"):
+                file_bytes = decoded
+        except (binascii.Error, ValueError):
+            pass
+
+    validated = _validate_or_repair_zip_bytes(file_bytes)
+    if not validated:
+        return _error_response("bad_request", "File is not a valid Office document or is corrupted", 400)
+    file_bytes = validated
+
+    try:
+        extraction_map = {
+            "pptx": extract_text_from_pptx_bytes,
+            "docx": extract_text_from_docx_bytes,
+            "xlsx": extract_text_from_xlsx_bytes,
+        }
+        content = extraction_map[ext](file_bytes)
+        return func.HttpResponse(content, status_code=200, headers={"Content-Type": "text/plain; charset=utf-8", "X-Request-ID": _request_ctx.request_id})
+    except MemoryError:
+        return _error_response("out_of_memory", "Insufficient memory to process the file", 507)
+    except Exception as e:
+        _logger.error("Extraction failed: %s", e, exc_info=True)
+        return _error_response("failed_to_process", "Unexpected error during extraction", 500, details=str(e))
+
+
+@app.route(route="translateText", methods=["POST"])
+def translate_text_route(req: func.HttpRequest) -> func.HttpResponse:
+    _assign_request_id(req)
+    ok, detail = _verify_jwt(req)
+    if not ok:
+        return _error_response("unauthorized", "Authorization failed", 401, details=detail)
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("bad_request", "Invalid JSON payload", 400)
+    text = body.get("text")
+    if not text:
+        return _error_response("bad_request", "'text' is required", 400)
+    to_lang = body.get("to") or os.getenv("DEFAULT_TARGET_LANG", "fr")
+    from_lang = body.get("from") or os.getenv("DEFAULT_SOURCE_LANG", "en")
+    try:
+        translated = translate_text(text=text, to_lang=to_lang, from_lang=from_lang)
+    except TranslationError as e:
+        return _error_response("translation_failed", str(e), 500)
+    return func.HttpResponse(
+        json.dumps({"translatedText": translated, "to": to_lang, "from": from_lang, "request_id": _request_ctx.request_id}),
+        status_code=200,
+        mimetype="application/json",
+        headers={"X-Request-ID": _request_ctx.request_id},
+    )
+
+
+@app.route(route="translateFile", methods=["POST"])
+def translate_file_route(req: func.HttpRequest) -> func.HttpResponse:
+    _assign_request_id(req)
+    _logger.info("translateFile route triggered method=%s url=%s", req.method, req.url)
+    
+    ok, detail = _verify_jwt(req)
+    if not ok:
+        return _error_response("unauthorized", "Authorization failed", 401, details=detail)
+    
+    try:
+        body = req.get_json()
+        _logger.info("Request body parsed successfully")
+    except ValueError as e:
+        _logger.error("Invalid JSON payload: %s", e, exc_info=True)
+        return _error_response("bad_request", "Invalid JSON payload", 400)
+    
+    file_url = body.get("fileUrl")
+    if not file_url:
+        _logger.error("Missing 'fileUrl' in request body")
+        return _error_response("bad_request", "'fileUrl' is required", 400)
+    
+    to_lang = body.get("to") or os.getenv("DEFAULT_TARGET_LANG", "fr")
+    from_lang = body.get("from") or os.getenv("DEFAULT_SOURCE_LANG", "en")
+    correlation_id = str(uuid.uuid4())
+    
+    _logger.info("Starting file translation: correlation_id=%s, file_url=%s, from=%s, to=%s", 
+                 correlation_id, file_url[:100], from_lang, to_lang)
+    
+    _purge_expired_jobs()
+    job_id = correlation_id
+    created_ok = _create_job(job_id, _request_ctx.request_id, original_url=file_url)
+    if not created_ok:
+        return _error_response("job_init_failed", "Unable to persist initial job state", 500, details={"jobId": job_id})
+
+    def _worker():
+        try:
+            result = translate_remote_file(file_url=file_url, to_lang=to_lang, from_lang=from_lang, correlation_id=correlation_id)
+            result["request_id"] = _request_ctx.request_id
+            if "error" in result:
+                _logger.error("Async translation failed job_id=%s error=%s", job_id, result.get("error"))
+                _set_job_result(job_id, result, failed=True)
+            else:
+                _logger.info("Async translation completed job_id=%s", job_id)
+                _set_job_result(job_id, result, failed=False)
+        except MemoryError:
+            err = {"error": "out_of_memory", "message": "Insufficient memory", "correlationId": correlation_id, "memory": get_memory_info()}
+            _set_job_result(job_id, err, failed=True)
+        except TimeoutError:
+            err = {"error": "timeout", "message": "Processing exceeded time limit", "correlationId": correlation_id}
+            _set_job_result(job_id, err, failed=True)
+        except Exception as e:
+            err = {"error": "remote_translation_failed", "message": str(e), "correlationId": correlation_id, "error_type": type(e).__name__, "memory": get_memory_info()}
+            _set_job_result(job_id, err, failed=True)
+
+    parent_request_id = getattr(_request_ctx, "request_id", None)
+
+    def _worker_wrapper():
+        if parent_request_id:
+            _request_ctx.request_id = parent_request_id
+        try:
+            _worker()
+        finally:
+            if hasattr(_request_ctx, "request_id"):
+                delattr(_request_ctx, "request_id")
+
+    _job_executor.submit(_worker_wrapper)
+
+    polling_url = f"{req.url.rstrip('/')}/status/{job_id}"
+    accepted_body = {
+        "status": "accepted",
+        "jobId": job_id,
+        "pollingUrl": polling_url,
+        "request_id": _request_ctx.request_id,
+    }
+    return func.HttpResponse(
+        json.dumps(accepted_body),
+        status_code=202,
+        mimetype="application/json",
+        headers={
+            "X-Request-ID": _request_ctx.request_id,
+            "Location": polling_url,
+            "Retry-After": os.getenv("TRANSLATEFILE_RETRY_AFTER", "3"),
+        },
+    )
+
+
+@app.route(route="translateFile/status/{job_id}", methods=["GET"])
+def translate_file_status_route(req: func.HttpRequest) -> func.HttpResponse:
+    _assign_request_id(req)
+    job_id = getattr(req, "route_params", {}).get("job_id")
+    if not job_id:
+        return _error_response("bad_request", "Missing job_id route parameter", 400)
+    job = _get_job(job_id)
+    if not job:
+        return _error_response("not_found", f"Job '{job_id}' not found", 404)
+    status = job.get("status")
+    if status == "pending":
+        body = {
+            "status": "pending",
+            "jobId": job_id,
+            "request_id": _request_ctx.request_id,
+        }
+        return func.HttpResponse(
+            json.dumps(body),
+            status_code=202,
+            mimetype="application/json",
+            headers={"X-Request-ID": _request_ctx.request_id, "Retry-After": os.getenv("TRANSLATEFILE_RETRY_AFTER", "3")},
+        )
+    result = job.get("result", {})
+    body = {
+        "status": status,
+        "jobId": job_id,
+        "result": result,
+        "request_id": _request_ctx.request_id,
+    }
+    return func.HttpResponse(
+        json.dumps(body),
+        status_code=200,
+        mimetype="application/json",
+        headers={"X-Request-ID": _request_ctx.request_id},
+    )
+
+
+@app.route(route="health", methods=["GET"])
+def health(req: func.HttpRequest) -> func.HttpResponse:
+    _assign_request_id(req)
+    body = {
+        "status": "ok",
+        "version": VERSION,
+        "jwtEnabled": bool(JWT_SECRET),
+        "blobMode": bool(BLOB_CONNECTION_STRING or BLOB_ACCOUNT_URL),
+        "maxUploadMB": round(MAX_CONTENT_LENGTH / (1024 * 1024), 2),
+        "maxBlobFetchMB": MAX_BLOB_FETCH_MB,
+        "memory": get_memory_info(),
+        "request_id": _request_ctx.request_id,
+    }
+    return func.HttpResponse(json.dumps(body), status_code=200, mimetype="application/json", headers={"X-Request-ID": _request_ctx.request_id})
