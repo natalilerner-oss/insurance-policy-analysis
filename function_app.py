@@ -81,6 +81,10 @@ logging.basicConfig(
 _logger = logging.getLogger("insurance-func")
 _logger.addFilter(RequestIdFilter())
 
+_blob_config = get_blob_config_status()
+if not _blob_config.get("configured"):
+    _logger.warning("Blob storage not configured. Missing: %s", ", ".join(_blob_config.get("missing", [])))
+
 def get_memory_info():
     """Get current process memory usage in MB"""
     try:

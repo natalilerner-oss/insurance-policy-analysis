@@ -1,9 +1,11 @@
 from openpyxl import Workbook
+from openpyxl.chart import BarChart, Reference
+from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from io import BytesIO
 from decimal import Decimal
-from typing import List
+from typing import Dict, List, Tuple
 try:
     from .insurance_portfolio_schema import InsurancePortfolioRequest, InsuranceProduct, Coverage
 except ImportError:
@@ -90,6 +92,17 @@ def generate_insurance_portfolio(data: InsurancePortfolioRequest) -> BytesIO:
     # Auto-fit columns
     _auto_fit_columns(ws)
 
+    # Conditional formatting for high premiums
+    if ws.max_row >= 2:
+        ws.conditional_formatting.add(
+            f"G2:G{ws.max_row}",
+            CellIsRule(operator="greaterThan", formula=["1000"], fill=PatternFill(start_color="FECACA", fill_type="solid"))
+        )
+
+    _add_summary_sheet(wb, data)
+    _add_comparison_sheet(wb, data)
+    _add_projection_sheet(wb, data)
+
     output = BytesIO()
     wb.save(output)
     output.seek(0)
@@ -98,6 +111,8 @@ def generate_insurance_portfolio(data: InsurancePortfolioRequest) -> BytesIO:
 def _write_product(ws, start_row: int, product: InsuranceProduct) -> int:
     """Write a single insurance product, return next row number"""
     row = start_row
+
+    exclusions_discounts = _format_exclusions_discounts(product)
 
     if product.coverages:
         # Health-type product with coverage breakdown
@@ -113,13 +128,9 @@ def _write_product(ws, start_row: int, product: InsuranceProduct) -> int:
             ws.cell(row=row, column=6, value=coverage.name)
             ws.cell(row=row, column=7, value=float(coverage.premium)).number_format = CURRENCY_FORMAT
 
-            if i == 0 and (product.exclusions or product.discounts):
-                exclusions_discounts = []
-                if product.exclusions:
-                    exclusions_discounts.append(product.exclusions)
-                if product.discounts:
-                    exclusions_discounts.append(product.discounts)
-                ws.cell(row=row, column=8, value=" | ".join(exclusions_discounts))
+            if i == 0 and exclusions_discounts:
+                cell = ws.cell(row=row, column=8, value=exclusions_discounts)
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
 
             row += 1
 
@@ -140,17 +151,150 @@ def _write_product(ws, start_row: int, product: InsuranceProduct) -> int:
         ws.cell(row=row, column=6, value=product.details)
         ws.cell(row=row, column=7, value=float(product.premium or 0)).number_format = CURRENCY_FORMAT
 
-        exclusions_discounts = []
-        if product.exclusions:
-            exclusions_discounts.append(product.exclusions)
-        if product.discounts:
-            exclusions_discounts.append(product.discounts)
         if exclusions_discounts:
-            ws.cell(row=row, column=8, value=" | ".join(exclusions_discounts))
+            cell = ws.cell(row=row, column=8, value=exclusions_discounts)
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
 
         row += 1
 
     return row
+
+
+def _format_exclusions_discounts(product: InsuranceProduct) -> str:
+    parts = []
+    if product.exclusions:
+        parts.append(f"החרגות: {product.exclusions}")
+    if product.discounts:
+        parts.append(f"הנחות: {product.discounts}")
+    return "\n".join(parts)
+
+
+def _product_premium(product: InsuranceProduct) -> float:
+    if product.coverages:
+        return float(sum(c.premium for c in product.coverages))
+    return float(product.premium or 0)
+
+
+def _add_summary_sheet(wb: Workbook, data: InsurancePortfolioRequest) -> None:
+    ws = wb.create_sheet("סיכום")
+    ws.sheet_view.rightToLeft = True
+
+    ws["A1"] = "שם משפחה"
+    ws["B1"] = data.family_name
+    ws["A2"] = "תאריך דוח"
+    ws["B2"] = str(data.report_date)
+
+    total_premium = sum(_product_premium(p) for p in data.insurance_products)
+    ws["A3"] = "מספר פוליסות"
+    ws["B3"] = len(data.insurance_products)
+    ws["A4"] = "סה""כ פרמיה חודשית"
+    ws["B4"] = float(total_premium)
+    ws["B4"].number_format = CURRENCY_FORMAT
+
+    ws["A6"] = "פרמיה לפי מבוטח"
+    ws["A7"] = "מבוטח"
+    ws["B7"] = "פרמיה חודשית"
+    ws["A7"].font = HEADER_FONT
+    ws["B7"].font = HEADER_FONT
+    ws["A7"].fill = HEADER_FILL
+    ws["B7"].fill = HEADER_FILL
+
+    member_totals: Dict[str, float] = {}
+    for product in data.insurance_products:
+        member_totals.setdefault(product.member_name, 0)
+        member_totals[product.member_name] += _product_premium(product)
+
+    row = 8
+    for member, total in member_totals.items():
+        ws.cell(row=row, column=1, value=member)
+        ws.cell(row=row, column=2, value=float(total)).number_format = CURRENCY_FORMAT
+        row += 1
+
+    if member_totals:
+        chart = BarChart()
+        chart.title = "פרמיה חודשית לפי מבוטח"
+        chart.y_axis.title = "פרמיה חודשית"
+        chart.x_axis.title = "מבוטח"
+        data_ref = Reference(ws, min_col=2, min_row=7, max_row=row - 1)
+        cats_ref = Reference(ws, min_col=1, min_row=8, max_row=row - 1)
+        chart.add_data(data_ref, titles_from_data=True)
+        chart.set_categories(cats_ref)
+        ws.add_chart(chart, "D7")
+
+    _auto_fit_columns(ws)
+
+
+def _add_comparison_sheet(wb: Workbook, data: InsurancePortfolioRequest) -> None:
+    ws = wb.create_sheet("השוואת פוליסות")
+    ws.sheet_view.rightToLeft = True
+
+    policies: List[Tuple[str, InsuranceProduct]] = []
+    for idx, product in enumerate(data.insurance_products):
+        label = product.policy_number or f"policy_{idx + 1}"
+        policies.append((label, product))
+
+    ws.cell(row=1, column=1, value="כיסוי")
+    for col, (label, _) in enumerate(policies, start=2):
+        ws.cell(row=1, column=col, value=label)
+
+    row = 2
+    for _, product in policies:
+        if product.coverages:
+            for coverage in product.coverages:
+                ws.cell(row=row, column=1, value=f"{product.product_name} - {coverage.name}")
+                row += 1
+        else:
+            ws.cell(row=row, column=1, value=product.product_name)
+            row += 1
+
+    # Fill premiums matrix
+    for col, (_, product) in enumerate(policies, start=2):
+        row = 2
+        if product.coverages:
+            for coverage in product.coverages:
+                ws.cell(row=row, column=col, value=float(coverage.premium)).number_format = CURRENCY_FORMAT
+                row += 1
+        else:
+            ws.cell(row=row, column=col, value=_product_premium(product)).number_format = CURRENCY_FORMAT
+
+    # Style header
+    for col in range(1, len(policies) + 2):
+        cell = ws.cell(row=1, column=col)
+        cell.font = HEADER_FONT
+        cell.fill = HEADER_FILL
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    _auto_fit_columns(ws)
+
+
+def _add_projection_sheet(wb: Workbook, data: InsurancePortfolioRequest) -> None:
+    ws = wb.create_sheet("תחזיות פרמיה")
+    ws.sheet_view.rightToLeft = True
+
+    ws.cell(row=1, column=1, value="כיסוי")
+    ws.cell(row=1, column=2, value="גיל")
+    ws.cell(row=1, column=3, value="פרמיה חודשית")
+    for col in range(1, 4):
+        cell = ws.cell(row=1, column=col)
+        cell.font = HEADER_FONT
+        cell.fill = HEADER_FILL
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    row = 2
+    for product in data.insurance_products:
+        projections = getattr(product, "premium_projections", None) or []
+        for projection_group in projections:
+            group_name = projection_group.get("coverage") or projection_group.get("appendix") or product.product_name
+            for point in projection_group.get("projections", []) or []:
+                ws.cell(row=row, column=1, value=group_name)
+                ws.cell(row=row, column=2, value=point.get("age"))
+                ws.cell(row=row, column=3, value=point.get("monthly") or 0).number_format = CURRENCY_FORMAT
+                row += 1
+
+    if row == 2:
+        ws.cell(row=2, column=1, value="אין תחזיות פרמיה זמינות")
+
+    _auto_fit_columns(ws)
 
 def _auto_fit_columns(ws):
     """Auto-fit column widths based on content"""

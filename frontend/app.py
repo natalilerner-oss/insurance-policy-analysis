@@ -5,6 +5,7 @@ import os
 import base64
 from datetime import datetime, date
 from dotenv import load_dotenv
+import pandas as pd
 
 load_dotenv()
 
@@ -77,10 +78,11 @@ with col2:
 st.divider()
 
 # Main workflow tabs
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📤 1. העלאת פוליסות",
     "📋 2. סקירת נתונים", 
-    "📊 3. יצירת תיק ביטוח"
+    "📊 3. יצירת תיק ביטוח",
+    "🔍 4. השוואת פוליסות"
 ])
 
 # ==================== TAB 1: Upload Policies ====================
@@ -426,6 +428,46 @@ with tab3:
                         st.error(f"Error: {response.status_code}")
                 except Exception as e:
                     st.error(str(e))
+
+# ==================== TAB 4: Compare Policies ====================
+with tab4:
+    st.header("השוואת פוליסות")
+
+    if not st.session_state.extracted_policies:
+        st.warning("⚠️ לא נמצאו פוליסות. העלה קבצים בלשונית הראשונה.")
+    else:
+        st.markdown("בחר להשוות את הכיסויים והפרמיות בין הפוליסות שחולצו.")
+
+        if st.button("🔍 השווה פוליסות", type="primary", use_container_width=True):
+            with st.spinner("מבצע השוואה..."):
+                try:
+                    response = requests.post(
+                        f"{backend_url}/compare_policies",
+                        json={"policies": st.session_state.extracted_policies},
+                        timeout=30
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+                        st.success("✅ ההשוואה הושלמה")
+
+                        summary = result.get("policies", [])
+                        if summary:
+                            st.subheader("סיכום פוליסות")
+                            st.dataframe(pd.DataFrame(summary), use_container_width=True, hide_index=True)
+
+                        rows = result.get("rows", [])
+                        columns = result.get("columns", [])
+                        if rows:
+                            st.subheader("השוואת כיסויים")
+                            df = pd.DataFrame(rows)
+                            if columns:
+                                df = df.reindex(columns=columns)
+                            st.dataframe(df, use_container_width=True)
+                    else:
+                        st.error(f"❌ שגיאה: {response.status_code} - {response.text}")
+                except Exception as e:
+                    st.error(f"❌ שגיאת חיבור: {str(e)}")
 
 # Footer
 st.divider()
