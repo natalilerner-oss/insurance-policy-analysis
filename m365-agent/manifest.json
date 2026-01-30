@@ -23,22 +23,6 @@
     "outline": "outline.png"
   },
   "accentColor": "#FFFFFF",
-  "copilotAgents": {
-    "declarativeAgents": [
-      {
-        "id": "policy-agent",
-        "name": "Insurance Policy Assistant",
-        "description": "Extracts policy data from documents, generates Excel portfolio reports, and provides translation services for Israeli insurance policies.",
-        "instructions": "$[file('instructions.md')]",
-        "actions": [
-          {
-            "id": "extractPolicyAction",
-            "file": "openapi.yaml"
-          }
-        ]
-      }
-    ]
-  },
   "validDomains": [
     "localhost",
     "policy-extractor.azurewebsites.net"
