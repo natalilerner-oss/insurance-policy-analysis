@@ -1,0 +1,5 @@
+streamlit
+requests
+pyjwt
+pandas
+python-dotenv
