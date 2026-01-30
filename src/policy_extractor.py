@@ -8,31 +8,12 @@ from openai import AzureOpenAI
 
 from src.policy_schema import PolicyDocument
 
-EXTRACTION_SYSTEM_PROMPT = """
-You are an expert Israeli insurance document analyst. Extract ALL data from the policy into structured JSON.
-
-Key extraction rules:
-1. Dates: Convert to ISO format (YYYY-MM-DD). Handle formats like DD/MM/YYYY and MM/YYYY.
-2. Premiums: Extract both base price (לפני הנחה) and final price (אחרי הנחה).
-3. Exclusions (החרגות): Map each exclusion to specific coverage/appendix.
-4. Premium projections: Extract the full age-based premium table.
-5. Hebrew terms: Provide English translations for all Hebrew fields.
-6. Coverage periods: Note if coverage is "מתחדשת" (renewable) vs fixed term.
-
-Insurance companies mapping:
-- פניקס / fnx = Phoenix (Fenix)
-- הראל = Harel
-- מגדל = Migdal
-- כלל = Clal
-- מנורה = Menora
-
-Coverage types mapping:
-- מחלות קשות = Critical Illness
-- ניתוחים = Surgeries  
-- תרופות = Medications
-- השתלות = Transplants
-- אמבולטורי = Ambulatory Services
-"""
+EXTRACTION_SYSTEM_PROMPT = (
+    "You are an insurance document analyst specializing in Israeli health insurance policies. "
+    "Extract all policy details into the specified JSON schema. "
+    "For Hebrew text, provide both original and English translation. "
+    "Pay special attention to coverage types, premiums, exclusions, and premium projection tables."
+)
 
 
 def _extract_json_from_text(text: str) -> Dict[str, Any]:
