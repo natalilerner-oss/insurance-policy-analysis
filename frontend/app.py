@@ -177,7 +177,7 @@ with tab2:
         
         for policy in st.session_state.extracted_policies:
             if 'total_monthly_premium' in policy:
-                total_premium += policy.get('total_monthly_premium', 0)
+                total_premium += policy.get('total_monthly_premium') or 0
             if 'policyholder' in policy and 'name' in policy['policyholder']:
                 all_members.add(policy['policyholder']['name'])
         
@@ -213,7 +213,7 @@ with tab2:
                         carrier = policy['carrier']
                         st.markdown(f"**חברת ביטוח:** {carrier.get('name', 'N/A')}")
                     st.markdown(f"**מספר פוליסה:** {policy.get('policy_number', 'N/A')}")
-                    st.markdown(f"**פרמיה חודשית:** ₪{policy.get('total_monthly_premium', 0):,.2f}")
+                    st.markdown(f"**פרמיה חודשית:** ₪{(policy.get('total_monthly_premium') or 0):,.2f}")
                 
                 # Coverages
                 if 'coverages' in policy and policy['coverages']:
@@ -225,7 +225,7 @@ with tab2:
                         coverage_data.append({
                             "סוג כיסוי": cov.get('type', ''),
                             "שם מוצר": cov.get('product_name', ''),
-                            "פרמיה": f"₪{cov.get('premium', {}).get('final_monthly', 0):,.2f}" if isinstance(cov.get('premium'), dict) else f"₪{cov.get('premium', 0):,.2f}"
+                            "פרמיה": f"₪{(cov.get('premium', {}).get('final_monthly') or 0):,.2f}" if isinstance(cov.get('premium'), dict) else f"₪{(cov.get('premium') or 0):,.2f}"
                         })
                     
                     st.dataframe(coverage_data, use_container_width=True, hide_index=True)
@@ -308,7 +308,7 @@ with tab3:
                         "company": policy.get('carrier', {}).get('name', ''),
                         "product_name": cov.get('type', ''),
                         "details": cov.get('product_name', ''),
-                        "premium": cov.get('premium', {}).get('final_monthly', 0) if isinstance(cov.get('premium'), dict) else cov.get('premium', 0),
+                        "premium": (cov.get('premium', {}).get('final_monthly') or 0) if isinstance(cov.get('premium'), dict) else (cov.get('premium') or 0),
                         "exclusions": '',
                         "discounts": ''
                     }
@@ -321,8 +321,8 @@ with tab3:
                     
                     # Check for discounts
                     if isinstance(cov.get('premium'), dict):
-                        discount = cov['premium'].get('discount_percent', 0)
-                        if discount > 0:
+                        discount = cov['premium'].get('discount_percent') or 0
+                        if discount and discount > 0:
                             product['discounts'] = f"{discount}%"
                     
                     insurance_products.append(product)
