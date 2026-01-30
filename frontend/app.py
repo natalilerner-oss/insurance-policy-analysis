@@ -177,7 +177,7 @@ with tab2:
         
         for policy in st.session_state.extracted_policies:
             if 'total_monthly_premium' in policy:
-                total_premium += policy.get('total_monthly_premium', 0)
+                total_premium += policy.get('total_monthly_premium') or 0
             if 'policyholder' in policy and 'name' in policy['policyholder']:
                 all_members.add(policy['policyholder']['name'])
         
@@ -213,7 +213,7 @@ with tab2:
                         carrier = policy['carrier']
                         st.markdown(f"**חברת ביטוח:** {carrier.get('name', 'N/A')}")
                     st.markdown(f"**מספר פוליסה:** {policy.get('policy_number', 'N/A')}")
-                    st.markdown(f"**פרמיה חודשית:** ₪{policy.get('total_monthly_premium', 0):,.2f}")
+                    st.markdown(f"**פרמיה חודשית:** ₪{(policy.get('total_monthly_premium') or 0):,.2f}")
                 
                 # Coverages
                 if 'coverages' in policy and policy['coverages']:
