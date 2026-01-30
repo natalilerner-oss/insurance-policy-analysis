@@ -41,8 +41,8 @@ from docx import Document
 import openpyxl
 from azure.storage.blob import BlobClient, ContainerClient
 
-from src.services.translator import translate_text, TranslationError
-from src.services.document_translation import translate_remote_file
+from src.insurance_portfolio_schema import InsurancePortfolioRequest
+from src.insurance_portfolio_generator import generate_insurance_portfolio
 
 # --------------------------------------------------------------------------- 
 # Configuration for new capabilities
