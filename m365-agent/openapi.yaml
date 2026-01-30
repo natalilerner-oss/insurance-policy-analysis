@@ -3,7 +3,7 @@ info:
   title: Insurance Policy Data Extraction API
   version: 1.0.0
 servers:
-  - url: https://YOUR_FUNCTION_APP_HOST
+  - url: https://your-function-app.azurewebsites.net
 paths:
   /api/extract_policy:
     post:
