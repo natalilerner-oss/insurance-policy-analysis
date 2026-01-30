@@ -12,7 +12,7 @@
    - Update developer info, privacy URL, etc.
 
 2. **Create Icons**
-   - Add `color.png` (32x32) and `outline.png` (20x20) to this directory
+   - Replace `color.png` (32x32) and `outline.png` (20x20) with actual PNG files
    - Use PNG format with transparent background
 
 3. **Package the App**
