@@ -1,0 +1,88 @@
+openapi: 3.0.3
+info:
+  title: Insurance Policy Data Extraction API
+  version: 1.0.0
+servers:
+  - url: https://YOUR_FUNCTION_APP_HOST
+paths:
+  /api/extract_policy:
+    post:
+      summary: Extract policy data (sync)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                file_base64:
+                  type: string
+                filename:
+                  type: string
+              required:
+                - file_base64
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Extraction result
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/extract_policy_async:
+    post:
+      summary: Extract policy data (async)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                file_base64:
+                  type: string
+                filename:
+                  type: string
+              required:
+                - file_base64
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "202":
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  pollingUrl:
+                    type: string
+  /api/extract_policy/status/{jobId}:
+    get:
+      summary: Get job status
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                type: object
