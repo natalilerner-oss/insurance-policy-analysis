@@ -58,7 +58,7 @@ BLOB_CONTAINER_NAME = os.getenv("BLOB_CONTAINER_NAME")
 BLOB_SAS_TOKEN = os.getenv("BLOB_SAS_TOKEN")
 MAX_BLOB_FETCH_MB = int(os.getenv("MAX_BLOB_FETCH_MB", str(200)))
 
-app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
+app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 # --------------------------------------------------------------------------- 
 # Logging and helpers for new capabilities
