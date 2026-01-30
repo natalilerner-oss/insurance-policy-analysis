@@ -2,7 +2,6 @@ import base64
 import json
 import logging
 import os
-import threading
 import uuid
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -10,6 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import azure.functions as func
 from azure.storage.blob import ContentSettings, generate_blob_sas, BlobSasPermissions
+from requests_toolbelt.multipart.decoder import MultipartDecoder
 
 from src.azure_clients import (
     get_blob_service_client,
@@ -18,24 +18,39 @@ from src.azure_clients import (
 )
 from src.hebrew_utils import contains_hebrew
 from src.policy_extractor import extract_policy
+from src.job_store import load_job, save_job
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
-
-JOB_STORE: Dict[str, Dict[str, Any]] = {}
-JOB_LOCK = threading.Lock()
 
 
 def _parse_multipart(body: bytes, content_type: str) -> Optional[Tuple[bytes, str]]:
     try:
         import cgi
 
-        environ = {"REQUEST_METHOD": "POST"}
-        headers = {"content-type": content_type}
-        fp = BytesIO(body)
-        form = cgi.FieldStorage(fp=fp, environ=environ, headers=headers)
-        if "file" in form:
-            file_item = form["file"]
-            return file_item.file.read(), file_item.filename or "upload"
+        decoder = MultipartDecoder(body, content_type)
+        file_parts = []
+        fields: Dict[str, str] = {}
+
+        for part in decoder.parts:
+            headers = {k.decode().lower(): v.decode() for k, v in part.headers.items()}
+            disposition = headers.get("content-disposition", "")
+            _, params = cgi.parse_header(disposition)
+            name = params.get("name")
+            filename = params.get("filename")
+
+            if filename:
+                file_parts.append((name or "file", filename, part.content))
+            elif name:
+                fields[name] = part.text
+
+        if "file_base64" in fields:
+            filename = fields.get("filename", "document")
+            return base64.b64decode(fields["file_base64"]), filename
+
+        if file_parts:
+            preferred = [p for p in file_parts if p[0] in {"file", "document", "upload"}]
+            chosen = preferred[0] if preferred else file_parts[0]
+            return chosen[2], chosen[1] or "upload"
         return None
     except Exception:
         return None
@@ -116,14 +131,24 @@ def _run_extraction(job_id: str, content: bytes) -> None:
         )
 
         download_url = _upload_result(job_id, result)
-        with JOB_LOCK:
-            JOB_STORE[job_id]["status"] = "completed"
-            JOB_STORE[job_id]["result"] = result
-            JOB_STORE[job_id]["download_url"] = download_url
+        save_job(
+            job_id,
+            {
+                "jobId": job_id,
+                "status": "completed",
+                "result": result,
+                "download_url": download_url,
+            },
+        )
     except Exception as exc:
-        with JOB_LOCK:
-            JOB_STORE[job_id]["status"] = "failed"
-            JOB_STORE[job_id]["error"] = str(exc)
+        save_job(
+            job_id,
+            {
+                "jobId": job_id,
+                "status": "failed",
+                "error": str(exc),
+            },
+        )
 
 
 @app.route(route="extract_policy")
@@ -164,16 +189,24 @@ def extract_policy_async(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(str(exc), status_code=400)
 
     job_id = str(uuid.uuid4())
-    with JOB_LOCK:
-        JOB_STORE[job_id] = {
-            "status": "running",
-            "created_at": datetime.utcnow().isoformat(),
-        }
+    try:
+        save_job(
+            job_id,
+            {
+                "jobId": job_id,
+                "status": "running",
+                "created_at": datetime.utcnow().isoformat(),
+            },
+        )
+    except Exception as exc:
+        return func.HttpResponse(str(exc), status_code=500)
+
+    import threading
 
     thread = threading.Thread(target=_run_extraction, args=(job_id, content), daemon=True)
     thread.start()
 
-    status_url = f"{req.url.rstrip('/')}/status/{job_id}"
+    status_url = req.url.replace("/extract_policy_async", f"/extract_policy/status/{job_id}")
     response = {"jobId": job_id, "pollingUrl": status_url}
     return func.HttpResponse(json.dumps(response), mimetype="application/json", status_code=202)
 
@@ -184,8 +217,10 @@ def extract_policy_status(req: func.HttpRequest) -> func.HttpResponse:
     if not job_id:
         return func.HttpResponse("jobId is required", status_code=400)
 
-    with JOB_LOCK:
-        job = JOB_STORE.get(job_id)
+    try:
+        job = load_job(job_id)
+    except Exception as exc:
+        return func.HttpResponse(str(exc), status_code=500)
 
     if not job:
         return func.HttpResponse("Job not found", status_code=404)
