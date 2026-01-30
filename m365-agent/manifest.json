@@ -13,8 +13,8 @@
     "full": "Declarative agent that processes Israeli health insurance policies, extracts structured data, and generates comprehensive Excel portfolio reports with Hebrew RTL formatting."
   },
   "developer": {
-    "name": "Your Company",
-    "websiteUrl": "https://example.com",
+    "name": "documentinsight.Assistant",
+    "websiteUrl": "https://documentinsight.ai/",
     "privacyUrl": "https://example.com/privacy",
     "termsOfUseUrl": "https://example.com/terms"
   },
@@ -25,6 +25,6 @@
   "accentColor": "#FFFFFF",
   "validDomains": [
     "localhost",
-    "policy-extractor.azurewebsites.net"
+    "policy-extractor-30058.azurewebsites.net"
   ]
 }
