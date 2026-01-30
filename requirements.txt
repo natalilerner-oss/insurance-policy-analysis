@@ -1,0 +1,5 @@
+azure-functions
+azure-ai-formrecognizer>=3.3.0
+azure-storage-blob>=12.19.0
+openai>=1.40.0
+pydantic>=2.6.0
