@@ -117,7 +117,7 @@ def _run_extraction(job_id: str, content: bytes) -> None:
     try:
         doc_client = get_document_intelligence_client()
         openai_client = get_openai_client()
-        deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1")
 
         sample_text, _ = doc_client.begin_analyze_document("prebuilt-document", content).result(), None
         source_language = _detect_language(sample_text.content if sample_text else "")
@@ -158,7 +158,7 @@ def extract_policy_sync(req: func.HttpRequest) -> func.HttpResponse:
         content, _ = _parse_request_payload(req)
         doc_client = get_document_intelligence_client()
         openai_client = get_openai_client()
-        deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1")
 
         preview = doc_client.begin_analyze_document("prebuilt-document", content).result()
         source_language = _detect_language(preview.content if preview else "")
