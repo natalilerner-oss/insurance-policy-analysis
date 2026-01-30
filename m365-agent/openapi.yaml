@@ -86,3 +86,177 @@ paths:
             application/json:
               schema:
                 type: object
+  /api/generate_insurance_portfolio:
+    post:
+      summary: Generate family insurance portfolio Excel report
+      description: Creates a comprehensive Excel report of family insurance policies with Hebrew RTL layout, including coverage breakdowns, premiums, and exclusions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsurancePortfolioRequest'
+      responses:
+        "200":
+          description: Excel report generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsurancePortfolioResponse'
+        "400":
+          description: Bad request - invalid data
+        "401":
+          description: Unauthorized
+        "500":
+          description: Server error
+components:
+  schemas:
+    InsurancePortfolioRequest:
+      type: object
+      required:
+        - family_name
+        - report_date
+        - family_members
+        - insurance_products
+      properties:
+        family_name:
+          type: string
+          description: Family name in Hebrew (e.g., "ישראלי")
+          example: "ישראלי"
+        report_date:
+          type: string
+          format: date
+          description: Report generation date
+          example: "2024-01-15"
+        family_members:
+          type: array
+          items:
+            $ref: '#/components/schemas/FamilyMember'
+          description: List of family members
+        insurance_products:
+          type: array
+          items:
+            $ref: '#/components/schemas/InsuranceProduct'
+          description: List of insurance policies
+    FamilyMember:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Full name of family member
+          example: "ראובן ישראלי"
+        role:
+          type: string
+          description: Role in family (optional)
+          example: "ראש משפחה"
+    InsuranceProduct:
+      type: object
+      required:
+        - member_name
+        - start_date
+        - company
+        - product_name
+      properties:
+        member_name:
+          type: string
+          description: Name of insured member
+          example: "ראובן ישראלי"
+        policy_number:
+          type: string
+          description: Policy number (optional)
+          example: "12345678"
+        start_date:
+          type: string
+          format: date
+          description: Insurance start date
+          example: "2020-10-01"
+        company:
+          type: string
+          description: Insurance company name
+          example: "הראל"
+        product_name:
+          type: string
+          description: Product type (בריאות, מחלות קשות, ביטוח חיים, etc.)
+          example: "בריאות"
+        details:
+          type: string
+          description: Additional details for non-health products
+          example: "סכום ביטוח 1,000,000 ₪"
+        coverages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Coverage'
+          description: Coverage breakdown for health insurance
+        premium:
+          type: number
+          format: decimal
+          description: Monthly premium amount
+          example: 145.09
+        exclusions:
+          type: string
+          description: Policy exclusions
+          example: "מחלת כבד קודמת"
+        discounts:
+          type: string
+          description: Discounts and special terms
+          example: "15% עד 06/2026"
+    Coverage:
+      type: object
+      required:
+        - name
+        - premium
+      properties:
+        name:
+          type: string
+          description: Coverage name
+          example: "ניתוחים שקל ראשון"
+        start_date:
+          type: string
+          format: date
+          description: Coverage start date (optional)
+        premium:
+          type: number
+          format: decimal
+          description: Monthly premium for this coverage
+          example: 101.04
+    InsurancePortfolioResponse:
+      type: object
+      required:
+        - success
+        - filename
+        - downloadUrl
+        - summary
+      properties:
+        success:
+          type: boolean
+          example: true
+        filename:
+          type: string
+          description: Generated Excel filename
+          example: "תיק_ביטוח_משפחת_ישראלי_2024-01-15.xlsx"
+        downloadUrl:
+          type: string
+          description: Secure download URL with SAS token
+          example: "https://storage.blob.core.windows.net/excel-reports/ישראלי_2024-01-15.xlsx?..."
+        summary:
+          type: object
+          properties:
+            family_name:
+              type: string
+              example: "ישראלי"
+            report_date:
+              type: string
+              format: date
+              example: "2024-01-15"
+            products_count:
+              type: integer
+              example: 3
+            total_monthly_premium:
+              type: number
+              format: decimal
+              example: 125.39
+            family_members_count:
+              type: integer
+              example: 2
