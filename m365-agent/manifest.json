@@ -14,10 +14,24 @@
   },
   "developer": {
     "name": "documentinsight.Assistant",
-    "websiteUrl": "https://documentinsight.ai/",
-    "privacyUrl": "https://example.com/privacy",
-    "termsOfUseUrl": "https://example.com/terms"
+    "websiteUrl": "https://policy-extractor-30058.azurewebsites.net",
+    "privacyUrl": "https://policy-extractor-30058.azurewebsites.net/privacy",
+    "termsOfUseUrl": "https://policy-extractor-30058.azurewebsites.net/terms"
   },
+  "composeExtensions": [
+    {
+      "composeExtensionType": "apiBased",
+      "apiSpecificationFile": "openapi.yaml",
+      "commands": [
+        {
+          "id": "POST /api/extract_policy",
+          "type": "query",
+          "title": "Extract Policy Data",
+          "description": "Extracts structured data from an insurance policy document provided as a file."
+        }
+      ]
+    }
+  ],
   "icons": {
     "color": "color.png",
     "outline": "outline.png"
