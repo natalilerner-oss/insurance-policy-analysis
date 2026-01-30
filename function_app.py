@@ -933,6 +933,13 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
         "maxUploadMB": round(MAX_CONTENT_LENGTH / (1024 * 1024), 2),
         "maxBlobFetchMB": MAX_BLOB_FETCH_MB,
         "supportedFormats": ["pptx", "docx", "xlsx", "pdf"],
+        "capabilities": [
+            "insurance_policy_extraction",
+            "office_document_text_extraction",
+            "text_translation",
+            "file_translation",
+            "insurance_portfolio_excel_generation"
+        ],
         "memory": get_memory_info(),
         "request_id": _request_ctx.request_id,
     }

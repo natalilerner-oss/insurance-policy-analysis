@@ -6,6 +6,39 @@ from decimal import Decimal
 from typing import List
 from .insurance_portfolio_schema import InsurancePortfolioRequest, InsuranceProduct, Coverage
 
+# Hebrew Terminology Reference
+INSURANCE_COMPANIES = {
+    "harel": "הראל",
+    "phoenix": "פניקס",
+    "migdal": "מגדל",
+    "clal": "כלל",
+    "menora": "מנורה",
+    "ayalon": "איילון"
+}
+
+INSURANCE_PRODUCTS = {
+    "health": "בריאות",
+    "critical_illness": "מחלות קשות",
+    "life": "ביטוח חיים",
+    "disability": "אכ\"ע",
+    "personal_accident": "תאונות אישיות",
+    "service_letter": "כתב שירות"
+}
+
+HEALTH_COVERAGES = {
+    "surgeries_first_shekel": "ניתוחים שקל ראשון",
+    "surgery_alternatives": "טיפולי מחליפי ניתוח",
+    "transplants_abroad": "השתלות וטיפולים בחו\"ל",
+    "medical_consultation": "ייעוץ רפואי",
+    "special_medications": "תרופות מיוחדות",
+    "personal_physician": "רופא מלווה אישי",
+    "surgeries_abroad": "ביטוח לניתוחים בחו\"ל",
+    "ambulatory_services": "שירותיים אמבולטורים",
+    "premium_medications": "תרופות פרימיום",
+    "fast_diagnosis": "אבחון רפואי מהיר",
+    "medical_tech_devices": "טיפולי בטכנולוגיות ואביזר רפואי"
+}
+
 # Styling
 HEADER_FILL = PatternFill(start_color="4F46E5", fill_type="solid")
 HEADER_FONT = Font(bold=True, size=11, name="Arial", color="FFFFFF")
