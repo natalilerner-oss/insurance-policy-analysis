@@ -739,8 +739,8 @@ def extract(req: func.HttpRequest) -> func.HttpResponse:
         return _error_response("payload_too_large", f"File size exceeds limit of {MAX_CONTENT_LENGTH} bytes", 413)
 
     ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
-    if ext not in {"pptx", "docx", "xlsx"}:
-        return _error_response("unsupported_media_type", "Only .pptx, .docx, .xlsx files are supported", 415)
+    if ext not in {"pptx", "docx", "xlsx", "pdf"}:
+        return _error_response("unsupported_media_type", "Only .pptx, .docx, .xlsx, .pdf files are supported", 415)
 
     if not file_bytes.startswith(b"PK\x03\x04"):
         try:
@@ -751,15 +751,17 @@ def extract(req: func.HttpRequest) -> func.HttpResponse:
             pass
 
     validated = _validate_or_repair_zip_bytes(file_bytes)
-    if not validated:
+    if not validated and ext != "pdf":  # PDFs don't need ZIP validation
         return _error_response("bad_request", "File is not a valid Office document or is corrupted", 400)
-    file_bytes = validated
+    if validated:
+        file_bytes = validated
 
     try:
         extraction_map = {
             "pptx": extract_text_from_pptx_bytes,
             "docx": extract_text_from_docx_bytes,
             "xlsx": extract_text_from_xlsx_bytes,
+            "pdf": extract_text_from_pdf_bytes,
         }
         content = extraction_map[ext](file_bytes)
         return func.HttpResponse(content, status_code=200, headers={"Content-Type": "text/plain; charset=utf-8", "X-Request-ID": _request_ctx.request_id})
@@ -930,6 +932,7 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
         "blobMode": bool(BLOB_CONNECTION_STRING or BLOB_ACCOUNT_URL),
         "maxUploadMB": round(MAX_CONTENT_LENGTH / (1024 * 1024), 2),
         "maxBlobFetchMB": MAX_BLOB_FETCH_MB,
+        "supportedFormats": ["pptx", "docx", "xlsx", "pdf"],
         "memory": get_memory_info(),
         "request_id": _request_ctx.request_id,
     }
