@@ -366,6 +366,34 @@ def extract_text_from_xlsx_bytes(file_bytes: bytes) -> str:
         _logger.error("Error in XLSX extraction: %s, mem=%s", str(e), get_memory_info(), exc_info=True)
         raise
 
+def extract_text_from_pdf_bytes(file_bytes: bytes) -> str:
+    _logger.info("Starting PDF text extraction, bytes=%d, mem=%s", len(file_bytes), get_memory_info())
+    try:
+        from src.azure_clients import get_document_intelligence_client
+        doc_client = get_document_intelligence_client()
+        _logger.info("Document Intelligence client obtained, mem=%s", get_memory_info())
+        
+        # Analyze document for layout and text
+        poller = doc_client.begin_analyze_document("prebuilt-read", document=file_bytes)
+        result = poller.result()
+        
+        _logger.info("PDF analyzed, pages=%d, mem=%s", len(result.pages), get_memory_info())
+        
+        pages_text = []
+        for i, page in enumerate(result.pages, start=1):
+            page_lines = []
+            for line in page.lines:
+                page_lines.append(line.content)
+            if page_lines:
+                pages_text.append(f"--- Page {i} ---\n" + "\n".join(page_lines))
+        
+        result_text = "\n\n".join(pages_text)
+        _logger.info("PDF extraction complete, output_length=%d, mem=%s", len(result_text), get_memory_info())
+        return result_text
+    except Exception as e:
+        _logger.error("Error in PDF extraction: %s, mem=%s", str(e), get_memory_info(), exc_info=True)
+        raise
+
 def _validate_or_repair_zip_bytes(b: bytes) -> bytes | None:
     if zipfile.is_zipfile(io.BytesIO(b)):
         return b
