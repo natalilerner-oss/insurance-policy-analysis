@@ -8,7 +8,7 @@
 ## Steps
 
 1. **Update Manifest**
-   - Replace `your-function-app.azurewebsites.net` with your actual Azure Functions domain
+   - Replace `policy-extractor.azurewebsites.net` with your actual Azure Functions domain (if different)
    - Update developer info, privacy URL, etc.
 
 2. **Create Icons**
