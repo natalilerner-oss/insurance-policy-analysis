@@ -13,4 +13,5 @@ streamlit
 requests
 pandas
 python-dotenv
+matplotlib
 

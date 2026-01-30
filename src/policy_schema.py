@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Carrier(BaseModel):
@@ -41,6 +41,13 @@ class Premium(BaseModel):
     base_monthly: Optional[float] = None
     discount_percent: Optional[float] = None
     final_monthly: Optional[float] = None
+
+    @field_validator("discount_percent")
+    @classmethod
+    def validate_discount(cls, value: Optional[float]) -> Optional[float]:
+        if value is not None and (value < 0 or value > 100):
+            raise ValueError("Discount must be between 0 and 100")
+        return value
 
 
 class Coverage(BaseModel):
