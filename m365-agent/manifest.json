@@ -23,6 +23,22 @@
     "outline": "outline.png"
   },
   "accentColor": "#FFFFFF",
+  "copilotAgents": {
+    "declarativeAgents": [
+      {
+        "id": "policy-agent",
+        "name": "Policy Extractor",
+        "description": "Extracts policy data and returns structured JSON with Hebrew + English fields.",
+        "instructions": "$[file('instructions.md')]",
+        "actions": [
+          {
+            "id": "extractPolicyAction",
+            "file": "openapi.yaml"
+          }
+        ]
+      }
+    ]
+  },
   "validDomains": [
     "localhost",
     "policy-extractor.azurewebsites.net"
