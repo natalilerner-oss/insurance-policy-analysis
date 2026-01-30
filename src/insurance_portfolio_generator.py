@@ -4,7 +4,7 @@ from openpyxl.utils import get_column_letter
 from io import BytesIO
 from decimal import Decimal
 from typing import List
-from .insurance_portfolio_schema import InsurancePortfolioRequest, InsuranceProduct, Coverage
+from insurance_portfolio_schema import InsurancePortfolioRequest, InsuranceProduct, Coverage
 
 # Hebrew Terminology Reference
 INSURANCE_COMPANIES = {
