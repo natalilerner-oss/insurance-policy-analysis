@@ -3,7 +3,7 @@ info:
   title: Insurance Policy Data Extraction API
   version: 1.0.0
 servers:
-  - url: https://policy-extractor.azurewebsites.net
+  - url: https://policy-extractor-30058.azurewebsites.net
 paths:
   /api/extract_policy:
     post:
