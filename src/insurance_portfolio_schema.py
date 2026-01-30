@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import date
 from decimal import Decimal
 
@@ -21,6 +21,7 @@ class InsuranceProduct(BaseModel):
     premium: Optional[Decimal] = None  # Total premium (if no coverage breakdown)
     exclusions: Optional[str] = None   # החרגות
     discounts: Optional[str] = None    # הנחות (e.g., "15% עד 06/2026")
+    premium_projections: Optional[List[Any]] = None  # Optional projection data
 
 class FamilyMember(BaseModel):
     name: str
