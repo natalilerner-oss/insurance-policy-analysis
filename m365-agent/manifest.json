@@ -9,8 +9,8 @@
     "full": "Insurance Policy Data Extraction & Portfolio Management"
   },
   "description": {
-    "short": "Extract insurance data and generate portfolio reports.",
-    "full": "Declarative agent that processes Israeli health insurance policies, extracts structured data, and generates comprehensive Excel portfolio reports with Hebrew RTL formatting."
+    "short": "Extract insurance data and generate reports.",
+    "full": "Declarative agent that processes Israeli health insurance policies, extracts structured data, and generates comprehensive Excel portfolio reports with Hebrew RTL formatting. Supports PDF and image formats."
   },
   "developer": {
     "name": "documentinsight.Assistant",
