@@ -22,6 +22,8 @@ def translate_remote_file(file_url: str, to_lang: str, from_lang: str, correlati
         
         # Upload translated version to blob
         blob_service = get_blob_service_client()
+        if not blob_service:
+            raise TranslationError("Blob storage not configured. Set BLOB_CONNECTION_STRING or BLOB_ACCOUNT_URL + BLOB_SAS_TOKEN.")
         container_name = os.getenv("TRANSLATED_CONTAINER", "translated")
         translated_blob_name = f"{correlation_id}.txt"
         

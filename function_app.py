@@ -15,6 +15,7 @@ from requests_toolbelt.multipart.decoder import MultipartDecoder
 
 from src.azure_clients import (
     get_blob_service_client,
+    get_blob_config_status,
     get_document_intelligence_client,
     get_openai_client,
 )
@@ -110,6 +111,16 @@ def _error_response(key: str, message: str, status: int = 400, *, details: Any =
         status_code=status,
         headers={"Content-Type": "application/json", "X-Request-ID": getattr(_request_ctx, "request_id", "N/A")},
     )
+
+
+def _blob_unavailable_response() -> func.HttpResponse:
+    status = get_blob_config_status()
+    details = {
+        "configured": status.get("configured"),
+        "missing": status.get("missing"),
+        "required": "BLOB_CONNECTION_STRING or BLOB_ACCOUNT_URL + BLOB_SAS_TOKEN",
+    }
+    return _error_response("blob_unavailable", "Blob storage not configured", 503, details=details)
 
 def _verify_jwt(req: func.HttpRequest) -> Tuple[bool, Any]:
     if not JWT_SECRET:
@@ -591,24 +602,30 @@ def _run_extraction(job_id: str, content: bytes) -> None:
         )
 
         download_url = _upload_result(job_id, result)
-        save_job(
-            job_id,
-            {
-                "jobId": job_id,
-                "status": "completed",
-                "result": result,
-                "download_url": download_url,
-            },
-        )
+        try:
+            save_job(
+                job_id,
+                {
+                    "jobId": job_id,
+                    "status": "completed",
+                    "result": result,
+                    "download_url": download_url,
+                },
+            )
+        except Exception as save_exc:
+            _logger.error("Failed to persist job result: %s", save_exc)
     except Exception as exc:
-        save_job(
-            job_id,
-            {
-                "jobId": job_id,
-                "status": "failed",
-                "error": str(exc),
-            },
-        )
+        try:
+            save_job(
+                job_id,
+                {
+                    "jobId": job_id,
+                    "status": "failed",
+                    "error": str(exc),
+                },
+            )
+        except Exception as save_exc:
+            _logger.error("Failed to persist job failure: %s", save_exc)
 
 
 @app.route(route="extract_policy")
@@ -649,6 +666,8 @@ def extract_policy_async(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(str(exc), status_code=400)
 
     job_id = str(uuid.uuid4())
+    if not get_blob_config_status().get("configured"):
+        return _blob_unavailable_response()
     try:
         save_job(
             job_id,
@@ -677,6 +696,8 @@ def extract_policy_status(req: func.HttpRequest) -> func.HttpResponse:
     if not job_id:
         return func.HttpResponse("jobId is required", status_code=400)
 
+    if not get_blob_config_status().get("configured"):
+        return _blob_unavailable_response()
     try:
         job = load_job(job_id)
     except Exception as exc:
@@ -938,12 +959,89 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
             "office_document_text_extraction",
             "text_translation",
             "file_translation",
-            "insurance_portfolio_excel_generation"
+            "insurance_portfolio_excel_generation",
+            "policy_comparison"
         ],
         "memory": get_memory_info(),
         "request_id": _request_ctx.request_id,
     }
     return func.HttpResponse(json.dumps(body), status_code=200, mimetype="application/json", headers={"X-Request-ID": _request_ctx.request_id})
+
+
+@app.route(route="compare_policies", methods=["POST"])
+def compare_policies(req: func.HttpRequest) -> func.HttpResponse:
+    _assign_request_id(req)
+    _logger.info("compare_policies route triggered")
+    ok, detail = _verify_jwt(req)
+    if not ok:
+        return _error_response("unauthorized", "Authorization failed", 401, details=detail)
+
+    try:
+        body = req.get_json()
+    except ValueError as exc:
+        return _error_response("bad_request", f"Invalid JSON payload: {str(exc)}", 400)
+
+    policies = body.get("policies") if isinstance(body, dict) else body
+    if not isinstance(policies, list) or not policies:
+        return _error_response("bad_request", "Request must include a non-empty policies array", 400)
+
+    def policy_label(policy: Dict[str, Any], index: int) -> str:
+        policy_number = policy.get("policy_number") or f"policy_{index + 1}"
+        carrier = policy.get("carrier", {}).get("name")
+        return f"{policy_number} ({carrier})" if carrier else policy_number
+
+    def coverage_premium(coverage: Dict[str, Any]) -> float:
+        premium = coverage.get("premium")
+        if isinstance(premium, dict):
+            return float(premium.get("final_monthly") or premium.get("base_monthly") or 0)
+        if premium is None:
+            return 0.0
+        return float(premium)
+
+    policy_labels = []
+    summary = []
+    coverage_index: Dict[str, Dict[str, float]] = {}
+
+    for idx, policy in enumerate(policies):
+        if not isinstance(policy, dict):
+            continue
+        label = policy_label(policy, idx)
+        policy_labels.append(label)
+        total_premium = policy.get("total_monthly_premium") or 0
+        summary.append(
+            {
+                "policy": label,
+                "policy_number": policy.get("policy_number"),
+                "carrier": policy.get("carrier", {}).get("name"),
+                "total_monthly_premium": float(total_premium or 0),
+            }
+        )
+
+        for coverage in policy.get("coverages", []) or []:
+            if not isinstance(coverage, dict):
+                continue
+            coverage_name = coverage.get("type") or coverage.get("product_name") or "Coverage"
+            coverage_index.setdefault(coverage_name, {})[label] = coverage_premium(coverage)
+
+    comparison_rows = []
+    for coverage_name, by_policy in coverage_index.items():
+        row = {"coverage": coverage_name}
+        for label in policy_labels:
+            row[label] = by_policy.get(label, 0)
+        comparison_rows.append(row)
+
+    response = {
+        "policies": summary,
+        "columns": ["coverage"] + policy_labels,
+        "rows": comparison_rows,
+        "request_id": _request_ctx.request_id,
+    }
+    return func.HttpResponse(
+        json.dumps(response, ensure_ascii=False),
+        status_code=200,
+        mimetype="application/json",
+        headers={"X-Request-ID": _request_ctx.request_id},
+    )
 
 
 # --------------------------------------------------------------------------- 
