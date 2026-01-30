@@ -225,7 +225,7 @@ with tab2:
                         coverage_data.append({
                             "סוג כיסוי": cov.get('type', ''),
                             "שם מוצר": cov.get('product_name', ''),
-                            "פרמיה": f"₪{cov.get('premium', {}).get('final_monthly', 0):,.2f}" if isinstance(cov.get('premium'), dict) else f"₪{cov.get('premium', 0):,.2f}"
+                            "פרמיה": f"₪{(cov.get('premium', {}).get('final_monthly') or 0):,.2f}" if isinstance(cov.get('premium'), dict) else f"₪{(cov.get('premium') or 0):,.2f}"
                         })
                     
                     st.dataframe(coverage_data, use_container_width=True, hide_index=True)
@@ -308,7 +308,7 @@ with tab3:
                         "company": policy.get('carrier', {}).get('name', ''),
                         "product_name": cov.get('type', ''),
                         "details": cov.get('product_name', ''),
-                        "premium": cov.get('premium', {}).get('final_monthly', 0) if isinstance(cov.get('premium'), dict) else cov.get('premium', 0),
+                        "premium": (cov.get('premium', {}).get('final_monthly') or 0) if isinstance(cov.get('premium'), dict) else (cov.get('premium') or 0),
                         "exclusions": '',
                         "discounts": ''
                     }
@@ -321,7 +321,7 @@ with tab3:
                     
                     # Check for discounts
                     if isinstance(cov.get('premium'), dict):
-                        discount = cov['premium'].get('discount_percent', 0)
+                        discount = cov['premium'].get('discount_percent') or 0
                         if discount > 0:
                             product['discounts'] = f"{discount}%"
                     
