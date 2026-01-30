@@ -5,12 +5,12 @@
   "id": "efa2669a-475a-4c87-a9c3-c785fd509412",
   "packageName": "com.natalilerner.insurancepolicyagent",
   "name": {
-    "short": "Policy Extractor",
-    "full": "Insurance Policy Data Extraction & Translation"
+    "short": "Insurance Assistant",
+    "full": "Insurance Policy Data Extraction & Portfolio Management"
   },
   "description": {
-    "short": "Extract structured data from Israeli health insurance policies.",
-    "full": "Declarative agent that calls the Policy Extraction API to process Hebrew insurance documents and return structured JSON."
+    "short": "Extract insurance data and generate portfolio reports.",
+    "full": "Declarative agent that processes Israeli health insurance policies, extracts structured data, and generates comprehensive Excel portfolio reports with Hebrew RTL formatting."
   },
   "developer": {
     "name": "Your Company",
@@ -27,8 +27,8 @@
     "declarativeAgents": [
       {
         "id": "policy-agent",
-        "name": "Policy Extractor",
-        "description": "Extracts policy data and returns structured JSON with Hebrew + English fields.",
+        "name": "Insurance Policy Assistant",
+        "description": "Extracts policy data from documents, generates Excel portfolio reports, and provides translation services for Israeli insurance policies.",
         "instructions": "$[file('instructions.md')]",
         "actions": [
           {

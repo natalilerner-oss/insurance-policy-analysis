@@ -1,5 +1,22 @@
 # Microsoft 365 Copilot Agent Packaging Instructions
 
+## Features
+
+This Microsoft 365 Copilot agent provides comprehensive insurance policy management capabilities:
+
+### Core Features
+- **Policy Data Extraction**: Extract structured data from PDF/image insurance documents
+- **Async Processing**: Handle large documents with job status tracking
+- **Insurance Portfolio Excel Generation**: Create Hebrew RTL Excel reports for family insurance portfolios
+- **Office Document Text Extraction**: Extract text from .pptx, .docx, .xlsx, .pdf files
+- **Translation Services**: Translate text and documents between languages
+
+### New: Insurance Portfolio Excel Reports
+- Generate professional Excel reports with Hebrew RTL layout
+- Coverage breakdowns for health insurance policies
+- Automatic premium calculations and subtotals
+- Secure download links with SAS tokens
+
 ## Prerequisites
 - Node.js and npm installed
 - Microsoft 365 Developer account
@@ -39,3 +56,6 @@ Set in your Azure Functions app:
 - `BLOB_CONNECTION_STRING`
 - `JOBS_CONTAINER=policy-jobs`
 - `COMPLETED_JOBS_CONTAINER=policy-extractions`
+- `EXCEL_REPORTS_CONTAINER=excel-reports` (for portfolio Excel files)
+- `JWT_SECRET` (optional, for JWT authentication)
+- `LOG_LEVEL=INFO`
