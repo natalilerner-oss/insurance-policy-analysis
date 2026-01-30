@@ -37,6 +37,9 @@
     "outline": "outline.png"
   },
   "accentColor": "#FFFFFF",
+  "configurableTabs": [],
+  "staticTabs": [],
+  "bots": [],
   "validDomains": [
     "localhost",
     "policy-extractor-30058.azurewebsites.net"
