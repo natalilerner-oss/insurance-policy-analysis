@@ -231,38 +231,72 @@ def _add_comparison_sheet(wb: Workbook, data: InsurancePortfolioRequest) -> None
     policies: List[Tuple[str, InsuranceProduct]] = []
     for idx, product in enumerate(data.insurance_products):
         label = product.policy_number or f"policy_{idx + 1}"
+        if product.company:
+            label += f" ({product.company})"
         policies.append((label, product))
 
+    # Collect all unique coverage keys (normalized name or type)
+    # Map: key -> {policy_idx: premium, name: display_name}
+    coverage_map: Dict[str, Dict[str, Any]] = {}
+    
+    for p_idx, (_, product) in enumerate(policies):
+        if product.coverages:
+            for coverage in product.coverages:
+                # Use name as key, might need better normalization
+                key = coverage.name.strip()
+                if key not in coverage_map:
+                    coverage_map[key] = {"name": key, "premiums": {}}
+                
+                # If multiple of same type in one policy, sum them? Or assume unique?
+                # For now, sum if exists
+                existing = coverage_map[key]["premiums"].get(p_idx, 0)
+                coverage_map[key]["premiums"][p_idx] = existing + float(coverage.premium)
+        else:
+             # Product without breakdown (e.g. Life insurance)
+             key = product.product_name.strip()
+             if key not in coverage_map:
+                 coverage_map[key] = {"name": key, "premiums": {}}
+             
+             existing = coverage_map[key]["premiums"].get(p_idx, 0)
+             coverage_map[key]["premiums"][p_idx] = existing + _product_premium(product)
+
+    # Headers
     ws.cell(row=1, column=1, value="כיסוי")
     for col, (label, _) in enumerate(policies, start=2):
-        ws.cell(row=1, column=col, value=label)
-
-    row = 2
-    for _, product in policies:
-        if product.coverages:
-            for coverage in product.coverages:
-                ws.cell(row=row, column=1, value=f"{product.product_name} - {coverage.name}")
-                row += 1
-        else:
-            ws.cell(row=row, column=1, value=product.product_name)
-            row += 1
-
-    # Fill premiums matrix
-    for col, (_, product) in enumerate(policies, start=2):
-        row = 2
-        if product.coverages:
-            for coverage in product.coverages:
-                ws.cell(row=row, column=col, value=float(coverage.premium)).number_format = CURRENCY_FORMAT
-                row += 1
-        else:
-            ws.cell(row=row, column=col, value=_product_premium(product)).number_format = CURRENCY_FORMAT
-
-    # Style header
-    for col in range(1, len(policies) + 2):
-        cell = ws.cell(row=1, column=col)
+        cell = ws.cell(row=1, column=col, value=label)
         cell.font = HEADER_FONT
         cell.fill = HEADER_FILL
         cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Style first col
+    ws.cell(row=1, column=1).font = HEADER_FONT
+    ws.cell(row=1, column=1).fill = HEADER_FILL
+
+    # Write Data
+    row = 2
+    for key in sorted(coverage_map.keys()):
+        item = coverage_map[key]
+        ws.cell(row=row, column=1, value=item["name"])
+        
+        for p_idx, (label, _) in enumerate(policies):
+            col = p_idx + 2
+            val = item["premiums"].get(p_idx)
+            if val is not None:
+                ws.cell(row=row, column=col, value=val).number_format = CURRENCY_FORMAT
+            else:
+                ws.cell(row=row, column=col, value="-").alignment = Alignment(horizontal='center')
+        
+        row += 1
+
+    # Total Row
+    ws.cell(row=row, column=1, value="סה\"כ").font = Font(bold=True)
+    for p_idx in range(len(policies)):
+        col = p_idx + 2
+        # Sum column
+        col_letter = get_column_letter(col)
+        ws.cell(row=row, column=col, value=f"=SUM({col_letter}2:{col_letter}{row-1})").number_format = CURRENCY_FORMAT
+        ws.cell(row=row, column=col).font = Font(bold=True)
+        ws.cell(row=row, column=col).fill = SUBTOTAL_FILL
 
     _auto_fit_columns(ws)
 
