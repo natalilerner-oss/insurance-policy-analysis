@@ -66,12 +66,17 @@ def test_extraction(pdf_path: str):
 
 
 if __name__ == "__main__":
+    print("Starting test...")
     pdf_path = os.environ.get("TEST_POLICY_PDF", "sample_policy.txt")
+    print(f"Using file: {pdf_path}")
     if not Path(pdf_path).exists():
         raise FileNotFoundError(f"Policy file not found: {pdf_path}")
 
+    print("Running extraction...")
     result = test_extraction(pdf_path)
+    print("Extraction completed.")
     output = json.dumps(result, indent=2, ensure_ascii=False)
-    print(output)
+    print("Writing to file...")
     with open("extraction_test_result.json", "w", encoding="utf-8") as f:
         f.write(output)
+    print("Done.")

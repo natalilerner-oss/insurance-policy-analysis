@@ -1,0 +1,11 @@
+{
+  "policy_number": "123456789",
+  "insured_name": "John Doe",
+  "coverage_type": "Health Insurance",
+  "premium": 100,
+  "effective_date": "2024-01-01",
+  "metadata": {
+    "source_language": "en",
+    "pages_processed": 1
+  }
+}
