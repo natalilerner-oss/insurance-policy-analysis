@@ -3,7 +3,7 @@ services:
     name: insurance-policy-frontend
     env: python
     buildCommand: ./render_build.sh
-    startCommand: streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0
+    startCommand: python -m streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0
     envVars:
       - key: BACKEND_URL
         value: https://your-azure-func-app.azurewebsites.net/api
