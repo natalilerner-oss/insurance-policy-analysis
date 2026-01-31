@@ -29,6 +29,10 @@ def get_openai_client() -> AzureOpenAI:
 
 
 def get_blob_service_client() -> Optional[BlobServiceClient]:
+    """
+    Returns a BlobServiceClient if configured, otherwise None.
+    Checks for BLOB_CONNECTION_STRING, AzureWebJobsStorage, or BLOB_ACCOUNT_URL + BLOB_SAS_TOKEN.
+    """
     # Prefer an explicit app setting, but fall back to Azure Functions' built-in
     # storage connection string when available.
     connection = os.environ.get("BLOB_CONNECTION_STRING") or os.environ.get("AzureWebJobsStorage")
@@ -38,9 +42,48 @@ def get_blob_service_client() -> Optional[BlobServiceClient]:
     account_url = os.environ.get("BLOB_ACCOUNT_URL")
     sas_token = os.environ.get("BLOB_SAS_TOKEN")
     if account_url and sas_token:
+        # Append SAS token if not already in URL
+        if "?" not in account_url and not account_url.endswith("?") and "?" in sas_token:
+            # This logic assumes the SAS token needs to be appended, but BlobServiceClient
+            # takes named arguments. However, if the user provided just the base URL, it works.
+             return BlobServiceClient(account_url=account_url, credential=sas_token)
+        # If user passed full SAS URL in account_url (unlikely based on valid configuration)
         return BlobServiceClient(account_url=account_url, credential=sas_token)
 
     return None
+
+
+def validate_app_configuration() -> Dict[str, Any]:
+    """
+    Checks for required environment variables and returns status.
+    """
+    import logging
+    
+    missing = []
+    
+    # Check Document Intelligence
+    if not os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"):
+        missing.append("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
+    if not os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY"):
+        missing.append("AZURE_DOCUMENT_INTELLIGENCE_KEY")
+
+    # Check Azure OpenAI
+    if not os.environ.get("AZURE_OPENAI_ENDPOINT"):
+        missing.append("AZURE_OPENAI_ENDPOINT")
+    if not os.environ.get("AZURE_OPENAI_KEY"):
+        missing.append("AZURE_OPENAI_KEY")
+
+    # Check Blob Storage
+    blob_status = get_blob_config_status()
+    if not blob_status["configured"]:
+        missing.extend(blob_status["missing"])
+
+    if missing:
+        logging.warning(f"Configuration Warning: Missing environment variables: {', '.join(missing)}")
+    else:
+        logging.info("App configuration is valid.")
+
+    return {"valid": len(missing) == 0, "missing": missing, "blob_status": blob_status}
 
 
 def get_blob_config_status() -> Dict[str, Any]:
