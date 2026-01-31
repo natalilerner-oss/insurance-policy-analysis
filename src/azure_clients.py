@@ -37,19 +37,33 @@ def get_blob_service_client() -> Optional[BlobServiceClient]:
     # storage connection string when available.
     connection = os.environ.get("BLOB_CONNECTION_STRING") or os.environ.get("AzureWebJobsStorage")
     if connection:
-        return BlobServiceClient.from_connection_string(connection)
+        try:
+            return BlobServiceClient.from_connection_string(connection)
+        except Exception as e:
+            # If the connection string is invalid, log and return None or let it bubble?
+            # User wants improved error handling.
+            import logging
+            logging.error(f"Failed to create BlobServiceClient from connection string: {e}")
+            return None
 
     account_url = os.environ.get("BLOB_ACCOUNT_URL")
     sas_token = os.environ.get("BLOB_SAS_TOKEN")
     if account_url and sas_token:
-        # Append SAS token if not already in URL
-        if "?" not in account_url and not account_url.endswith("?") and "?" in sas_token:
-            # This logic assumes the SAS token needs to be appended, but BlobServiceClient
-            # takes named arguments. However, if the user provided just the base URL, it works.
-             return BlobServiceClient(account_url=account_url, credential=sas_token)
-        # If user passed full SAS URL in account_url (unlikely based on valid configuration)
-        return BlobServiceClient(account_url=account_url, credential=sas_token)
+        try:
+            # Append SAS token if not already in URL
+            if "?" not in account_url and not account_url.endswith("?") and "?" in sas_token:
+                # This logic assumes the SAS token needs to be appended, but BlobServiceClient
+                # takes named arguments. However, if the user provided just the base URL, it works.
+                return BlobServiceClient(account_url=account_url, credential=sas_token)
+            # If user passed full SAS URL in account_url (unlikely based on valid configuration)
+            return BlobServiceClient(account_url=account_url, credential=sas_token)
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to create BlobServiceClient from SAS: {e}")
+            return None
 
+    import logging
+    logging.warning("Blob storage is not configured (missing connection string or account URL + SAS).")
     return None
 
 
