@@ -12,14 +12,14 @@
         ".vscode",
         "node_modules"
     ],
-    "pythonVersion": "3.12",
+    "pythonVersion": "3.11",
     "pythonPlatform": "Linux",
     "executionEnvironments": [
         {
             "root": ".",
-            "python": "/usr/local/python/3.12.1/bin/python3",
+            "python": "/usr/local/python/3.11.1/bin/python3",
             "extraPaths": [
-                "/usr/local/python/3.12.1/lib/python3.12/site-packages",
+                "/usr/local/python/3.11.1/lib/python3.11/site-packages",
                 "src"
             ]
         }
