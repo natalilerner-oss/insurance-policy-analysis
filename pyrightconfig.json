@@ -19,7 +19,8 @@
             "root": ".",
             "python": "/usr/local/python/3.12.1/bin/python3",
             "extraPaths": [
-                "/usr/local/python/3.12.1/lib/python3.12/site-packages"
+                "/usr/local/python/3.12.1/lib/python3.12/site-packages",
+                "src"
             ]
         }
     ]
