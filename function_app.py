@@ -11,7 +11,8 @@ config_status = validate_app_configuration()
 if not config_status["valid"]:
     logger.warning("Startup Configuration Warning: The following environment variables are missing: %s", ", ".join(config_status["missing"]))
     if not config_status["blob_status"]["configured"]:
-        logger.error("Blob Storage is not configured. Some features (async extraction, large files) will fail.")
+        logger.error("Blob Storage is not configured. Async extraction and large file handling will return 503 Service Unavailable.")
+        logger.error("To fix: Set BLOB_CONNECTION_STRING or (BLOB_ACCOUNT_URL + BLOB_SAS_TOKEN) in local.settings.json or App Settings.")
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
