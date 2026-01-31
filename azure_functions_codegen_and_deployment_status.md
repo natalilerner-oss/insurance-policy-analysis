@@ -6,14 +6,14 @@
 | | Technology Stack | **Completed** | Python v2, Azure AI services, Blob Storage. |
 | | Resource Requirements | **Completed** | Identified Function App, Storage, OpenAI, Doc Intelligence. |
 | | Validation Strategy | **Completed** | Unit + Local Integration testing strategy defined. |
-| **2. Code Generation** | Prerequisites Check | **Pending** | Need to verify local tools and `local.settings.json`. |
-| | Best Practices Review | **Pending** | Will invoke `get_bestpractices` tools. |
-| | Code Refinement | **Pending** | Apply improvements based on best practices. |
-| **3. Local Validation** | Local Execution | **Pending** | `func start` validation. |
-| | Testing | **Pending** | Run `pytest` suite. |
-| **4. Deployment** | Deployment Prep | **Pending** | Check `requirements.txt`, `host.json`. |
+| **2. Code Generation** | Prerequisites Check | **In Progress** | requirements.txt analysed. Need to split frontend deps. |
+| | Best Practices Review | **Completed** | Gathered V2 model, Async, and Structure guidelines. |
+| | Code Refinement | **Pending** | Plan: specialized requirements.txt, Blueprint refactoring. |
+| **3. Local Validation** | Local Execution | **Pending** | func start validation. |
+| | Testing | **Pending** | Run pytest suite. |
+| **4. Deployment** | Deployment Prep | **Pending** | Check requirements.txt, host.json. |
 | | Deploy to Azure | **Pending** | Execute deployment. |
 | | Post-Deploy Verification | **Pending** | Smoke test. |
 
 ## Recent Updates
-*   **[2026-01-31]**: Initialized planning and status tracking files. Project structure analyzed.
+*   **[2026-01-31]**: Updated status. Identified that pandas and streamlit should be removed from the Function App environment. matplotlib is required. Plan to refactor function_app.py into Blueprints context.
