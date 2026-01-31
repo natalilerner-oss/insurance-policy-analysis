@@ -108,3 +108,80 @@ def generate_insurance_portfolio_endpoint(req: func.HttpRequest) -> func.HttpRes
     except Exception as e:
         logger.error("Failed to generate insurance portfolio: %s", e, exc_info=True)
         return error_response("failed_to_generate", f"Excel generation failed: {str(e)}", 500)
+
+from typing import Dict, Any
+
+@bp.route(route="compare_policies", methods=["POST"])
+def compare_policies(req: func.HttpRequest) -> func.HttpResponse:
+    assign_request_id(req)
+    logger.info("compare_policies route triggered")
+    ok, detail = verify_jwt(req)
+    if not ok:
+        return error_response("unauthorized", "Authorization failed", 401, details=detail)
+
+    try:
+        body = req.get_json()
+    except ValueError as exc:
+        return error_response("bad_request", f"Invalid JSON payload: {str(exc)}", 400)
+
+    policies = body.get("policies") if isinstance(body, dict) else body
+    if not isinstance(policies, list) or not policies:
+        return error_response("bad_request", "Request must include a non-empty policies array", 400)
+
+    def policy_label(policy: Dict[str, Any], index: int) -> str:
+        policy_number = policy.get("policy_number") or f"policy_{index + 1}"
+        carrier = policy.get("carrier", {}).get("name")
+        return f"{policy_number} ({carrier})" if carrier else policy_number
+
+    def coverage_premium(coverage: Dict[str, Any]) -> float:
+        premium = coverage.get("premium")
+        if isinstance(premium, dict):
+            return float(premium.get("final_monthly") or premium.get("base_monthly") or 0)
+        if premium is None:
+            return 0.0
+        return float(premium)
+
+    policy_labels = []
+    summary = []
+    coverage_index: Dict[str, Dict[str, float]] = {}
+
+    for idx, policy in enumerate(policies):
+        if not isinstance(policy, dict):
+            continue
+        label = policy_label(policy, idx)
+        policy_labels.append(label)
+        total_premium = policy.get("total_monthly_premium") or 0
+        summary.append(
+            {
+                "policy": label,
+                "policy_number": policy.get("policy_number"),
+                "carrier": policy.get("carrier", {}).get("name"),
+                "total_monthly_premium": float(total_premium or 0),
+            }
+        )
+
+        for coverage in policy.get("coverages", []) or []:
+            if not isinstance(coverage, dict):
+                continue
+            coverage_name = coverage.get("type") or coverage.get("product_name") or "Coverage"
+            coverage_index.setdefault(coverage_name, {})[label] = coverage_premium(coverage)
+
+    comparison_rows = []
+    for coverage_name, by_policy in coverage_index.items():
+        row = {"coverage": coverage_name}
+        for label in policy_labels:
+            row[label] = by_policy.get(label, 0)
+        comparison_rows.append(row)
+
+    response = {
+        "policies": summary,
+        "columns": ["coverage"] + policy_labels,
+        "rows": comparison_rows,
+        "request_id": get_request_id(),
+    }
+    return func.HttpResponse(
+        json.dumps(response, ensure_ascii=False),
+        status_code=200,
+        mimetype="application/json",
+        headers={"X-Request-ID": get_request_id()},
+    )
