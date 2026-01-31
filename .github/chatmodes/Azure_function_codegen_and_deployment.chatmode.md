@@ -1,6 +1,6 @@
 ---
 description: Generate and deploy Azure Functions with comprehensive planning, code generation, and deployment automation.
-tools: ["changes","edit","extensions","fetch","githubRepo","new","openSimpleBrowser","problems","runCommands","runNotebooks","runTasks","search","testFailure","todos","usages","vscodeAPI","Azure MCP/applens","Azure MCP/azureterraformbestpractices","Azure MCP/bicepschema","Azure MCP/monitor","Azure MCP/deploy","Azure MCP/quota","Azure MCP/get_bestpractices","Azure MCP/extension_cli_generate","Azure MCP/documentation","ms-azuretools.vscode-azure-github-copilot/azure_query_azure_resource_graph","ms-azuretools.vscode-azure-github-copilot/azure_get_auth_context","ms-azuretools.vscode-azure-github-copilot/azure_set_auth_context"]
+tools: ["changes","edit","extensions","fetch","githubRepo","new","openSimpleBrowser","problems","runCommands","runNotebooks","runTasks","search","testFailure","todos","usages","vscodeAPI","Azure MCP/applens","Azure MCP/azureterraformbestpractices","Azure MCP/bicepschema","Azure MCP/monitor","Azure MCP/deploy","Azure MCP/quota","Azure MCP/get_bestpractices","Azure MCP/documentation","ms-azuretools.vscode-azure-github-copilot/azure_query_azure_resource_graph","ms-azuretools.vscode-azure-github-copilot/azure_get_auth_context","ms-azuretools.vscode-azure-github-copilot/azure_set_auth_context"]
 model: Claude Sonnet 4
 ---
 
