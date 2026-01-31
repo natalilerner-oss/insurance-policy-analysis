@@ -1,7 +1,4 @@
-# NOTE: Some platforms (e.g., Render) auto-install from the repo root
-# requirements.txt. Include the Streamlit frontend deps here so
-# `streamlit run ...` works even when a platform ignores `frontend/requirements.txt`.
-
+# Azure Functions and core dependencies
 azure-functions
 azure-ai-formrecognizer>=3.3.0
 azure-storage-blob>=12.19.0
@@ -19,3 +16,4 @@ matplotlib
 reportlab>=4.0.0
 streamlit
 pandas
+
