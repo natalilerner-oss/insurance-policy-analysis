@@ -29,7 +29,9 @@ def get_openai_client() -> AzureOpenAI:
 
 
 def get_blob_service_client() -> Optional[BlobServiceClient]:
-    connection = os.environ.get("BLOB_CONNECTION_STRING")
+    # Prefer an explicit app setting, but fall back to Azure Functions' built-in
+    # storage connection string when available.
+    connection = os.environ.get("BLOB_CONNECTION_STRING") or os.environ.get("AzureWebJobsStorage")
     if connection:
         return BlobServiceClient.from_connection_string(connection)
 
@@ -43,16 +45,19 @@ def get_blob_service_client() -> Optional[BlobServiceClient]:
 
 def get_blob_config_status() -> Dict[str, Any]:
     connection = os.environ.get("BLOB_CONNECTION_STRING")
+    func_storage = os.environ.get("AzureWebJobsStorage")
     account_url = os.environ.get("BLOB_ACCOUNT_URL")
     sas_token = os.environ.get("BLOB_SAS_TOKEN")
     if connection:
         return {"configured": True, "mode": "connection_string", "missing": []}
+    if func_storage:
+        return {"configured": True, "mode": "azure_webjobs_storage", "missing": []}
     if account_url and sas_token:
         return {"configured": True, "mode": "account_url", "missing": []}
 
     missing = []
-    if not connection:
-        missing.append("BLOB_CONNECTION_STRING")
+    if not connection and not func_storage:
+        missing.append("BLOB_CONNECTION_STRING (or AzureWebJobsStorage)")
     if not account_url:
         missing.append("BLOB_ACCOUNT_URL")
     if not sas_token:

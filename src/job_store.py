@@ -13,7 +13,7 @@ def _get_container():
     blob_service = get_blob_service_client()
     if not blob_service:
         raise RuntimeError(
-            "Blob storage not configured. Set BLOB_CONNECTION_STRING or BLOB_ACCOUNT_URL + BLOB_SAS_TOKEN."
+            "Blob storage not configured. Set BLOB_CONNECTION_STRING (or AzureWebJobsStorage on Azure Functions) or BLOB_ACCOUNT_URL + BLOB_SAS_TOKEN."
         )
 
     container_name = os.environ.get("JOBS_CONTAINER", "policy-jobs")
