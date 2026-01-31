@@ -1,0 +1,6 @@
+Sample Insurance Policy
+Policy Number: 123456789
+Insured: John Doe
+Coverage: Health Insurance
+Premium: $100 per month
+Effective Date: 2024-01-01
