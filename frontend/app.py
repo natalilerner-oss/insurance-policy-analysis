@@ -138,8 +138,12 @@ with tab1:
                 try:
                     # Send to extraction API
                     files = {'file': (file.name, file.getvalue(), file.type)}
+                    full_url = f"{backend_url}/extract_policy"
+                    st.text(f"Calling: {full_url}")
+                    print(f"Calling: {full_url}")
+
                     response = requests.post(
-                        f"{backend_url}/extract_policy",
+                        full_url,
                         files=files,
                         timeout=120
                     )
@@ -151,9 +155,12 @@ with tab1:
                         st.success(f"✅ {file.name} - חילוץ הושלם")
                     else:
                         st.error(f"❌ {file.name} - שגיאה: {response.status_code}")
+                        print(f"Error response: {response.status_code} - {response.text}")
+                        st.text(f"Response: {response.text}")
                         
                 except Exception as e:
                     st.error(f"❌ {file.name} - שגיאה: {str(e)}")
+                    print(f"Exception: {str(e)}")
             
             progress_bar.progress(100)
             status_text.text("✨ החילוץ הושלם!")
