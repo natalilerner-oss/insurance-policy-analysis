@@ -10,5 +10,8 @@
     "python.testing.unittestEnabled": true,
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "python-envs.pythonProjects": [],
-    "python.defaultInterpreterPath": "/home/codespace/.python/current/bin/python"
+    "python.defaultInterpreterPath": "/usr/local/python/3.12.1/bin/python3",
+    "python.analysis.extraPaths": [
+        "/usr/local/python/3.12.1/lib/python3.12/site-packages"
+    ]
 }

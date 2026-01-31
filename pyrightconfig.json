@@ -1,0 +1,26 @@
+{
+    "include": [
+        "src",
+        "frontend",
+        "m365-agent",
+        "create_sample_pdf.py",
+        "test_*.py"
+    ],
+    "exclude": [
+        "__pycache__",
+        ".git",
+        ".vscode",
+        "node_modules"
+    ],
+    "pythonVersion": "3.12",
+    "pythonPlatform": "Linux",
+    "executionEnvironments": [
+        {
+            "root": ".",
+            "python": "/usr/local/python/3.12.1/bin/python3",
+            "extraPaths": [
+                "/usr/local/python/3.12.1/lib/python3.12/site-packages"
+            ]
+        }
+    ]
+}
