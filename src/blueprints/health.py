@@ -11,6 +11,7 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
     assign_request_id(req)
     JWT_SECRET = os.environ.get("JWT_SECRET")
     BLOB_CONNECTION_STRING = os.getenv("BLOB_CONNECTION_STRING")
+    AZURE_WEBJOBS_STORAGE = os.getenv("AzureWebJobsStorage")
     BLOB_ACCOUNT_URL = os.getenv("BLOB_ACCOUNT_URL")
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(50 * 1024 * 1024)))
     MAX_BLOB_FETCH_MB = int(os.getenv("MAX_BLOB_FETCH_MB", str(200)))
@@ -19,7 +20,7 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
         "status": "ok",
         "version": VERSION,
         "jwtEnabled": bool(JWT_SECRET),
-        "blobMode": bool(BLOB_CONNECTION_STRING or BLOB_ACCOUNT_URL),
+        "blobMode": bool(BLOB_CONNECTION_STRING or AZURE_WEBJOBS_STORAGE or BLOB_ACCOUNT_URL),
         "maxUploadMB": round(MAX_CONTENT_LENGTH / (1024 * 1024), 2),
         "maxBlobFetchMB": MAX_BLOB_FETCH_MB,
         "supportedFormats": ["pptx", "docx", "xlsx", "pdf"],

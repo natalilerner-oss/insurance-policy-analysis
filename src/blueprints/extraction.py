@@ -51,7 +51,7 @@ def _blob_unavailable_response() -> func.HttpResponse:
     details = {
         "configured": status.get("configured"),
         "missing": status.get("missing"),
-        "required": "BLOB_CONNECTION_STRING or BLOB_ACCOUNT_URL + BLOB_SAS_TOKEN",
+        "required": "BLOB_CONNECTION_STRING (or AzureWebJobsStorage) or BLOB_ACCOUNT_URL + BLOB_SAS_TOKEN",
     }
     return error_response("blob_unavailable", "Blob storage not configured", 503, details=details)
 
