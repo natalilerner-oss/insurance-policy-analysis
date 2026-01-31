@@ -20,10 +20,15 @@ class MockResult:
         self.pages = [1]
 
 class MockOpenAIClient:
-    def chat_completions_create(self, model, messages, temperature=0, **kwargs):
-        class MockResponse:
-            choices = [MockChoice()]
-        return MockResponse()
+    class Chat:
+        class Completions:
+            @staticmethod
+            def create(model, messages, temperature=0, **kwargs):
+                class MockResponse:
+                    choices = [MockChoice()]
+                return MockResponse()
+        completions = Completions()
+    chat = Chat()
 
 class MockChoice:
     def __init__(self):
@@ -66,4 +71,7 @@ if __name__ == "__main__":
         raise FileNotFoundError(f"Policy file not found: {pdf_path}")
 
     result = test_extraction(pdf_path)
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    output = json.dumps(result, indent=2, ensure_ascii=False)
+    print(output)
+    with open("extraction_test_result.json", "w", encoding="utf-8") as f:
+        f.write(output)
