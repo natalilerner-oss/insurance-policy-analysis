@@ -2,7 +2,7 @@ services:
   - type: web
     name: insurance-policy-frontend
     env: python
-    buildCommand: pip install -r frontend/requirements.txt
+    buildCommand: ./render_build.sh
     startCommand: streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0
     envVars:
       - key: BACKEND_URL
