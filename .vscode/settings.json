@@ -10,8 +10,18 @@
     "python.testing.unittestEnabled": true,
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "python-envs.pythonProjects": [],
-    "python.defaultInterpreterPath": "/usr/local/python/3.12.1/bin/python3",
+    "python.defaultInterpreterPath": "/workspaces/insurance-policy-analysis/.venv/bin/python",
     "python.analysis.extraPaths": [
-        "/usr/local/python/3.12.1/lib/python3.12/site-packages"
-    ]
+        "src"
+    ],
+    "search.exclude": {
+        "**/.venv": true,
+        "**/.env": true,
+        "**/node_modules": true,
+        "**/__pycache__": true
+    },
+    "files.exclude": {
+        "**/.venv": true,
+        "**/__pycache__": true
+    }
 }
