@@ -10,6 +10,12 @@ import pandas as pd
 
 load_dotenv()
 
+# Polling configuration constants
+POLL_MAX_WAIT_SECONDS = 600  # 10 minutes maximum wait time
+POLL_INITIAL_INTERVAL_SECONDS = 5  # Initial polling interval
+POLL_MAX_INTERVAL_SECONDS = 15  # Maximum polling interval
+POLL_BACKOFF_INCREMENT_SECONDS = 2  # Interval increase per poll
+
 # Configuration
 st.set_page_config(
     page_title="PolicyLens - מחלץ פוליסות ביטוח",
@@ -159,17 +165,18 @@ with tab1:
                         print(f"Job started: {job_id}, polling: {polling_url}")
                         
                         # Poll for completion with exponential backoff
-                        max_wait_time = 600  # 10 minutes max
-                        poll_interval = 5  # Start with 5 seconds
+                        poll_interval = POLL_INITIAL_INTERVAL_SECONDS
                         elapsed = 0
+                        consecutive_errors = 0
                         
-                        while elapsed < max_wait_time:
+                        while elapsed < POLL_MAX_WAIT_SECONDS:
                             time.sleep(poll_interval)
                             elapsed += poll_interval
                             
                             try:
                                 status_response = requests.get(polling_url, timeout=30)
                                 if status_response.status_code == 200:
+                                    consecutive_errors = 0  # Reset error count on success
                                     job_status = status_response.json()
                                     status = job_status.get("status")
                                     
@@ -187,16 +194,22 @@ with tab1:
                                     else:
                                         # Still running, update status
                                         status_text.text(f"מעבד: {file.name}... ({elapsed}s)")
-                                        # Increase poll interval with backoff, max 15 seconds
-                                        poll_interval = min(poll_interval + 2, 15)
+                                        # Increase poll interval with backoff
+                                        poll_interval = min(poll_interval + POLL_BACKOFF_INCREMENT_SECONDS, POLL_MAX_INTERVAL_SECONDS)
                                 else:
+                                    consecutive_errors += 1
                                     print(f"Polling error: {status_response.status_code}")
+                                    if consecutive_errors >= 3:
+                                        st.warning(f"⚠️ {file.name} - בעיית תקשורת זמנית, ממשיך לנסות...")
                             except Exception as poll_error:
+                                consecutive_errors += 1
                                 print(f"Polling exception: {poll_error}")
+                                if consecutive_errors >= 3:
+                                    st.warning(f"⚠️ {file.name} - בעיית תקשורת זמנית, ממשיך לנסות...")
                         else:
                             # Timeout waiting for completion
                             st.error(f"❌ {file.name} - תם הזמן המוקצב לחילוץ")
-                            print(f"Job timed out after {max_wait_time}s")
+                            print(f"Job timed out after {POLL_MAX_WAIT_SECONDS}s")
                     
                     elif response.status_code == 200:
                         # Sync response (fallback if async not available)
