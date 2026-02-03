@@ -48,7 +48,7 @@ In the Azure Portal, navigate to **Configuration** → **Application settings** 
 
 | Name | Value | Description |
 |------|-------|-------------|
-| `BACKEND_URL` | `https://policy-extractor-30058.azurewebsites.net/api` | URL to your Azure Function backend |
+| `BACKEND_URL` | `https://<your-backend-name>.azurewebsites.net/api` | URL to your Azure Function backend (replace with your actual backend URL) |
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `true` | Enable build during deployment |
 | `WEBSITES_PORT` | `8000` | Port that Streamlit will listen on |
 

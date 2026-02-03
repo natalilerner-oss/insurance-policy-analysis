@@ -2,6 +2,8 @@
 port = 8000
 address = "0.0.0.0"
 headless = true
+# CORS is handled by the backend Azure Function
+# Set to true only if frontend and backend are on different domains
 enableCORS = false
 enableXsrfProtection = true
 
