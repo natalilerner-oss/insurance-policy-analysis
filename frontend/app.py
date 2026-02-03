@@ -443,8 +443,8 @@ with tab3:
                             result = response.json()
                             st.success("✅ תיק הביטוח נוצר בהצלחה!")
                             
-                            if 'download_url' in result:
-                                st.markdown(f"### [📥 הורד את תיק הביטוח]({result['download_url']})")
+                            if 'downloadUrl' in result:
+                                st.markdown(f"### [📥 הורד את תיק הביטוח]({result['downloadUrl']})")
                             
                             if 'summary' in result:
                                 st.json(result['summary'])
