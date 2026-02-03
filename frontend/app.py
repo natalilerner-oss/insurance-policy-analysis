@@ -3,6 +3,7 @@ import requests
 import json
 import os
 import base64
+import time
 from datetime import datetime, date
 from dotenv import load_dotenv
 import pandas as pd
@@ -136,19 +137,69 @@ with tab1:
                 progress_bar.progress((i + 1) / len(uploaded_files))
                 
                 try:
-                    # Send to extraction API
+                    # Send to async extraction API to avoid timeout issues
                     files = {'file': (file.name, file.getvalue(), file.type)}
-                    full_url = f"{backend_url}/extract_policy"
+                    full_url = f"{backend_url}/extract_policy_async"
                     st.text(f"Calling: {full_url}")
                     print(f"Calling: {full_url}")
 
                     response = requests.post(
                         full_url,
                         files=files,
-                        timeout=120
+                        timeout=60
                     )
                     
-                    if response.status_code == 200:
+                    if response.status_code == 202:
+                        # Async job started, poll for completion
+                        job_data = response.json()
+                        job_id = job_data.get("jobId")
+                        polling_url = job_data.get("pollingUrl") or f"{backend_url}/extract_policy/status/{job_id}"
+                        
+                        st.text(f"📋 Job started: {job_id}")
+                        print(f"Job started: {job_id}, polling: {polling_url}")
+                        
+                        # Poll for completion with exponential backoff
+                        max_wait_time = 600  # 10 minutes max
+                        poll_interval = 5  # Start with 5 seconds
+                        elapsed = 0
+                        
+                        while elapsed < max_wait_time:
+                            time.sleep(poll_interval)
+                            elapsed += poll_interval
+                            
+                            try:
+                                status_response = requests.get(polling_url, timeout=30)
+                                if status_response.status_code == 200:
+                                    job_status = status_response.json()
+                                    status = job_status.get("status")
+                                    
+                                    if status == "completed":
+                                        data = job_status.get("result", {})
+                                        data['_source_file'] = file.name
+                                        extracted_policies.append(data)
+                                        st.success(f"✅ {file.name} - חילוץ הושלם")
+                                        break
+                                    elif status == "failed":
+                                        error_msg = job_status.get("error", "Unknown error")
+                                        st.error(f"❌ {file.name} - שגיאה: {error_msg}")
+                                        print(f"Job failed: {error_msg}")
+                                        break
+                                    else:
+                                        # Still running, update status
+                                        status_text.text(f"מעבד: {file.name}... ({elapsed}s)")
+                                        # Increase poll interval with backoff, max 15 seconds
+                                        poll_interval = min(poll_interval + 2, 15)
+                                else:
+                                    print(f"Polling error: {status_response.status_code}")
+                            except Exception as poll_error:
+                                print(f"Polling exception: {poll_error}")
+                        else:
+                            # Timeout waiting for completion
+                            st.error(f"❌ {file.name} - תם הזמן המוקצב לחילוץ")
+                            print(f"Job timed out after {max_wait_time}s")
+                    
+                    elif response.status_code == 200:
+                        # Sync response (fallback if async not available)
                         data = response.json()
                         data['_source_file'] = file.name
                         extracted_policies.append(data)
