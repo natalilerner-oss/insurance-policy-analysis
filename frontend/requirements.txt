@@ -9,3 +9,8 @@ python-dotenv>=1.0.0
 
 # Data processing for policy comparison and portfolio generation
 pandas>=2.0.0
+streamlit>=1.28.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+pandas>=2.0.0</content>
+<parameter name="filePath">/workspaces/insurance-policy-analysis/frontend/requirements.txt
