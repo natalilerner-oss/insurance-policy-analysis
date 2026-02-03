@@ -21,10 +21,17 @@ def get_openai_client() -> AzureOpenAI:
     api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21")
     if not endpoint or not key:
         raise ValueError("AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY are required")
+    
+    # Configure retry behavior:
+    # - max_retries=2: Reduce from default to fail faster on rate limits
+    # - timeout=60.0: Set a reasonable timeout for individual requests
+    # This helps avoid exceeding the frontend timeout (120s) when OpenAI returns 429 errors
     return AzureOpenAI(
         api_key=key,
         api_version=api_version,
         azure_endpoint=endpoint,
+        max_retries=2,
+        timeout=60.0,
     )
 
 

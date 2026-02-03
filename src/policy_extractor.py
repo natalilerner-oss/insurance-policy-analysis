@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any, Dict, Optional, Tuple
 
-from openai import AzureOpenAI
+from openai import AzureOpenAI, RateLimitError, APITimeoutError
 
 from src.policy_schema import PolicyDocument
 
@@ -74,14 +74,26 @@ def run_gpt_extraction(
         f"{document_text}"
     )
 
-    response = client.chat.completions.create(
-        model=deployment,
-        temperature=0,
-        messages=[
-            {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-    )
+    try:
+        response = client.chat.completions.create(
+            model=deployment,
+            temperature=0,
+            messages=[
+                {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+    except RateLimitError as e:
+        raise ValueError(
+            "OpenAI API rate limit exceeded. The service is temporarily overloaded. "
+            "Please try again in a few minutes."
+        ) from e
+    except APITimeoutError as e:
+        raise ValueError(
+            "OpenAI API request timed out. The service may be slow or overloaded. "
+            "Please try again later."
+        ) from e
+
     raw = response.choices[0].message.content
     return _extract_json_from_text(raw)
 
