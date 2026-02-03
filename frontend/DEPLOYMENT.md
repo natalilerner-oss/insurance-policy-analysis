@@ -231,7 +231,7 @@ The app will be available at `http://localhost:8501`
 ## Support
 
 For issues or questions:
-- Check Azure App Service documentation: https://docs.microsoft.com/azure/app-service/
+- Check Azure App Service documentation: https://learn.microsoft.com/azure/app-service/
 - Check Streamlit documentation: https://docs.streamlit.io/
 - Review GitHub Actions logs for deployment issues
 - Contact the development team
