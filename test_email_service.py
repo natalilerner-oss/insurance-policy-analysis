@@ -41,10 +41,12 @@ def test_send_email_without_sendgrid():
     """Test email sending when SendGrid is not configured"""
     print("\nTesting email without SendGrid configuration...")
     
-    # Ensure SENDGRID_API_KEY is not set
+    # Ensure SENDGRID_API_KEY and SENDER_EMAIL are not set
     with patch.dict(os.environ, {}, clear=False):
-        if 'SENDGRID_API_KEY' in os.environ:
-            del os.environ['SENDGRID_API_KEY']
+        # Remove both required env vars
+        for key in ['SENDGRID_API_KEY', 'SENDER_EMAIL']:
+            if key in os.environ:
+                del os.environ[key]
         
         result = send_portfolio_email(
             recipient_email="test@example.com",
@@ -56,7 +58,7 @@ def test_send_email_without_sendgrid():
         )
         
         assert result["success"] is False, "Should fail when SendGrid not configured"
-        assert "not configured" in result["message"], "Should mention configuration issue"
+        assert "not configured" in result["message"].lower(), "Should mention configuration issue"
         
     print("✅ SendGrid not configured test passed")
 

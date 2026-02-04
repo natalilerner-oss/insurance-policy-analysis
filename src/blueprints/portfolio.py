@@ -82,6 +82,9 @@ def generate_insurance_portfolio_endpoint(req: func.HttpRequest) -> func.HttpRes
 
         if download_url:
             # Send email asynchronously if recipient_email is provided
+            # Note: Using daemon thread for simplicity. For production with high reliability
+            # requirements, consider using a proper message queue (e.g., Azure Storage Queue)
+            # to ensure emails are not lost if the application shuts down.
             if data.recipient_email:
                 def send_email_async():
                     try:

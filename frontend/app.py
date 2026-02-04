@@ -430,10 +430,13 @@ with tab3:
         
         # Generate button
         if st.button("📊 צור תיק ביטוח Excel", type="primary", use_container_width=True):
-            # Basic email validation if send_email is checked
+            # Email validation if send_email is checked
             email_valid = True
             if send_email and recipient_email:
-                if '@' not in recipient_email or '.' not in recipient_email:
+                # Basic but more robust email validation
+                import re
+                email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                if not re.match(email_pattern, recipient_email):
                     st.error("❌ כתובת המייל אינה תקינה")
                     email_valid = False
             elif send_email and not recipient_email:

@@ -3,8 +3,11 @@ Email service for sending insurance portfolio download links via SendGrid.
 Supports Hebrew text with RTL formatting.
 
 Environment Variables Required:
-- SENDGRID_API_KEY: SendGrid API key for sending emails
-- SENDER_EMAIL: The email address to send from (e.g., "noreply@insurance-policy-analysis.com")
+- SENDGRID_API_KEY: SendGrid API key for sending emails (REQUIRED)
+- SENDER_EMAIL: The verified sender email address configured in SendGrid (REQUIRED)
+  
+Note: The sender email must be verified in your SendGrid account before sending emails.
+If these environment variables are not set, emails will not be sent and a warning will be logged.
 """
 
 import os
@@ -241,14 +244,17 @@ def send_portfolio_email(
     """
     # Check if SendGrid is configured
     api_key = os.getenv('SENDGRID_API_KEY')
-    sender_email = os.getenv('SENDER_EMAIL', 'noreply@insurance-policy-analysis.com')
+    sender_email = os.getenv('SENDER_EMAIL')
     
-    if not api_key:
-        logger.warning("SENDGRID_API_KEY not configured - email not sent")
+    if not api_key or not sender_email:
+        logger.warning(
+            "SendGrid not properly configured - email not sent. "
+            "Please set SENDGRID_API_KEY and SENDER_EMAIL environment variables."
+        )
         return {
             "success": False,
             "error": "SendGrid not configured",
-            "message": "Email service is not configured. Please set SENDGRID_API_KEY environment variable."
+            "message": "Email service is not configured. Please set SENDGRID_API_KEY and SENDER_EMAIL environment variables."
         }
     
     try:
