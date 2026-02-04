@@ -16,4 +16,5 @@ matplotlib
 reportlab>=4.0.0
 streamlit
 pandas
+sendgrid>=6.10.0
 
