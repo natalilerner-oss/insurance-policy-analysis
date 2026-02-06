@@ -402,6 +402,16 @@ with tab3:
                 value=date.today()
             )
         
+        # Email option
+        send_email = st.checkbox("📧 שלח לינק למייל", value=False)
+        recipient_email = None
+        if send_email:
+            recipient_email = st.text_input(
+                "כתובת מייל",
+                placeholder="example@email.com",
+                help="הזן כתובת מייל לקבלת קישור הורדה"
+            )
+        
         st.divider()
         
         # Preview what will be included
@@ -497,34 +507,71 @@ with tab3:
                         json=portfolio_request,
                         timeout=60
                     )
+            # Email validation if send_email is checked
+            email_valid = True
+            if send_email and recipient_email:
+                # Basic but more robust email validation
+                import re
+                email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                if not re.match(email_pattern, recipient_email):
+                    st.error("❌ כתובת המייל אינה תקינה")
+                    email_valid = False
+            elif send_email and not recipient_email:
+                st.error("❌ נא להזין כתובת מייל")
+                email_valid = False
+            
+            if not send_email or email_valid:
+                with st.spinner("מייצר תיק ביטוח..."):
+                    # Prepare portfolio request
+                    portfolio_request = {
+                        "family_name": portfolio_family_name,
+                        "report_date": str(report_date),
+                        "family_members": family_members,
+                        "insurance_products": insurance_products
+                    }
                     
-                    if response.status_code == 200:
-                        content_type = response.headers.get('Content-Type', '')
+                    # Add email if provided
+                    if send_email and recipient_email:
+                        portfolio_request["recipient_email"] = recipient_email
+                    
+                    try:
+                        response = requests.post(
+                            f"{backend_url}/generate_insurance_portfolio",
+                            json=portfolio_request,
+                            timeout=60
+                        )
                         
-                        if 'application/json' in content_type:
-                            result = response.json()
-                            st.success("✅ תיק הביטוח נוצר בהצלחה!")
+                        if response.status_code == 200:
+                            content_type = response.headers.get('Content-Type', '')
                             
-                            if 'downloadUrl' in result:
-                                st.markdown(f"### [📥 הורד את תיק הביטוח]({result['downloadUrl']})")
-                            
-                            if 'summary' in result:
-                                st.json(result['summary'])
+                            if 'application/json' in content_type:
+                                result = response.json()
+                                st.success("✅ תיק הביטוח נוצר בהצלחה!")
+                                
+                                # Show email confirmation if email was sent
+                                if send_email and recipient_email:
+                                    st.info(f"📧 קישור ההורדה נשלח למייל: {recipient_email}")
+                                
+                                if 'downloadUrl' in result:
+                                    st.markdown(f"### [📥 הורד את תיק הביטוח]({result['downloadUrl']})")
+                                
+                                if 'summary' in result:
+                                    st.json(result['summary'])
+                            else:
+                                # Direct file download
+                                st.success("✅ תיק הביטוח נוצר בהצלחה!")
+                                st.download_button(
+                                    label="📥 הורד תיק ביטוח Excel",
+                                    data=response.content,
+                                    file_name=f"תיק_ביטוח_{portfolio_family_name}_{report_date}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    use_container_width=True
+                                )
                         else:
-                            # Direct file download
-                            st.success("✅ תיק הביטוח נוצר בהצלחה!")
-                            st.download_button(
-                                label="📥 הורד תיק ביטוח Excel",
-                                data=response.content,
-                                file_name=f"תיק_ביטוח_{portfolio_family_name}_{report_date}.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                use_container_width=True
-                            )
-                    else:
-                        st.error(f"❌ שגיאה: {response.status_code} - {response.text}")
-                        
-                except Exception as e:
-                    st.error(f"❌ שגיאת חיבור: {str(e)}")
+                            st.error(f"❌ שגיאה: {response.status_code} - {response.text}")
+                            
+                    except Exception as e:
+                        st.error(f"❌ שגיאת חיבור: {str(e)}")
         
         # Manual JSON input (collapsed) — display sanitized when toggle is off
         with st.expander("🔧 הזנה ידנית (JSON)"):

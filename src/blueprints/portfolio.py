@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import datetime, timedelta
+import threading
 
 import azure.functions as func
 from azure.storage.blob import ContentSettings, generate_blob_sas, BlobSasPermissions
@@ -9,6 +10,7 @@ from src.azure_clients import get_blob_service_client
 from src.insurance_portfolio_schema import InsurancePortfolioRequest
 from src.insurance_portfolio_generator import generate_insurance_portfolio
 from src.blueprints.utils import assign_request_id, error_response, verify_jwt, logger, get_request_id
+from src.email_service import send_portfolio_email
 
 bp = func.Blueprint()
 
@@ -79,6 +81,34 @@ def generate_insurance_portfolio_endpoint(req: func.HttpRequest) -> func.HttpRes
                 # Continue to direct download fallback
 
         if download_url:
+            # Send email asynchronously if recipient_email is provided
+            # Note: Using daemon thread for simplicity. For production with high reliability
+            # requirements, consider using a proper message queue (e.g., Azure Storage Queue)
+            # to ensure emails are not lost if the application shuts down.
+            if data.recipient_email:
+                def send_email_async():
+                    try:
+                        result = send_portfolio_email(
+                            recipient_email=data.recipient_email,
+                            family_name=data.family_name,
+                            download_link=download_url,
+                            total_premium=float(total_premium),
+                            products_count=len(data.insurance_products),
+                            report_date=str(data.report_date)
+                        )
+                        if result.get("success"):
+                            logger.info(f"Email sent successfully to {data.recipient_email}")
+                        else:
+                            logger.warning(
+                                f"Failed to send email to {data.recipient_email}: {result.get('error', 'Unknown error')}"
+                            )
+                    except Exception as e:
+                        logger.error(f"Error in async email sending: {str(e)}", exc_info=True)
+                
+                # Start email sending in background thread
+                email_thread = threading.Thread(target=send_email_async, daemon=True)
+                email_thread.start()
+            
             response_data = {
                 "success": True,
                 "filename": filename,
