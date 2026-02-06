@@ -2,11 +2,20 @@ import streamlit as st
 import requests
 import json
 import os
+import sys
 import base64
 import time
 from datetime import datetime, date
+from pathlib import Path
 from dotenv import load_dotenv
 import pandas as pd
+
+# Ensure sibling modules are importable regardless of cwd
+sys.path.insert(0, str(Path(__file__).parent))
+from sanitizer import (
+    mask_id_number, mask_name, mask_address,
+    sanitize_policy, sanitize_policies,
+)
 
 load_dotenv()
 
@@ -56,23 +65,31 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar Configuration
-with st.sidebar:
-    st.image("https://documentinsight.ai/logo.png", width=200)
-    st.header("⚙️ הגדרות")
-    
-    default_url = os.getenv("BACKEND_URL", "http://localhost:7071/api")
-    backend_url = st.text_input("Backend URL", value=default_url)
-    
-    st.divider()
-    st.markdown("**DocumentInsight.ai**")
-    st.caption("From a junkyard of information to a gallery of Knowledge")
-
 # Initialize session state
 if 'extracted_policies' not in st.session_state:
     st.session_state.extracted_policies = []
 if 'family_name' not in st.session_state:
     st.session_state.family_name = ""
+if 'show_sensitive' not in st.session_state:
+    st.session_state.show_sensitive = False
+
+# Sidebar Configuration
+with st.sidebar:
+    st.image("https://documentinsight.ai/logo.png", width=200)
+    st.header("⚙️ הגדרות")
+
+    default_url = os.getenv("BACKEND_URL", "http://localhost:7071/api")
+    backend_url = st.text_input("Backend URL", value=default_url)
+
+    st.divider()
+    show_sensitive = st.toggle("🔓 הצג מידע רגיש", value=st.session_state.show_sensitive)
+    st.session_state.show_sensitive = show_sensitive
+    if not show_sensitive:
+        st.caption("🔒 מידע אישי מוסתר")
+
+    st.divider()
+    st.markdown("**DocumentInsight.ai**")
+    st.caption("From a junkyard of information to a gallery of Knowledge")
 
 # Header
 col1, col2 = st.columns([1, 4])
@@ -267,70 +284,103 @@ with tab2:
         
         # Display each policy
         for i, policy in enumerate(st.session_state.extracted_policies):
+            # Prepare display copy with PII masked when toggle is off
+            display = policy if st.session_state.show_sensitive else sanitize_policy(policy)
+
             with st.expander(
                 f"📄 פוליסה {i+1}: {policy.get('_source_file', 'Unknown')}",
                 expanded=(i == 0)
             ):
                 # Policy header
                 col1, col2 = st.columns(2)
-                
+
                 with col1:
-                    if 'policyholder' in policy:
-                        ph = policy['policyholder']
+                    if 'policyholder' in display:
+                        ph = display['policyholder']
                         st.markdown(f"**מבוטח:** {ph.get('name', 'N/A')}")
-                        st.markdown(f"**ת.ז.:** {ph.get('id_number', 'N/A')}")
+                        if st.session_state.show_sensitive:
+                            st.markdown(f"**ת.ז.:** {ph.get('id_number', 'N/A')}")
+                        else:
+                            st.markdown(f"**ת.ז.:** {ph.get('id_number', 'N/A')} 🔒")
                         st.markdown(f"**תאריך לידה:** {ph.get('date_of_birth', 'N/A')}")
-                
+
                 with col2:
-                    if 'carrier' in policy:
-                        carrier = policy['carrier']
+                    if 'carrier' in display:
+                        carrier = display['carrier']
                         st.markdown(f"**חברת ביטוח:** {carrier.get('name', 'N/A')}")
-                    st.markdown(f"**מספר פוליסה:** {policy.get('policy_number', 'N/A')}")
-                    st.markdown(f"**פרמיה חודשית:** ₪{(policy.get('total_monthly_premium') or 0):,.2f}")
-                
+                    st.markdown(f"**מספר פוליסה:** {display.get('policy_number', 'N/A')}")
+                    st.markdown(f"**פרמיה חודשית:** ₪{(display.get('total_monthly_premium') or 0):,.2f}")
+
                 # Coverages
-                if 'coverages' in policy and policy['coverages']:
+                if 'coverages' in display and display['coverages']:
                     st.markdown("---")
                     st.markdown("**כיסויים:**")
-                    
+
                     coverage_data = []
-                    for cov in policy['coverages']:
+                    for cov in display['coverages']:
                         coverage_data.append({
                             "סוג כיסוי": cov.get('type', ''),
                             "שם מוצר": cov.get('product_name', ''),
                             "פרמיה": f"₪{(cov.get('premium', {}).get('final_monthly') or 0):,.2f}" if isinstance(cov.get('premium'), dict) else f"₪{(cov.get('premium') or 0):,.2f}"
                         })
-                    
+
                     st.dataframe(coverage_data, use_container_width=True, hide_index=True)
-                
+
                 # Exclusions
-                if 'exclusions' in policy and policy['exclusions']:
+                if 'exclusions' in display and display['exclusions']:
                     st.markdown("---")
                     st.markdown("**החרגות:**")
-                    for exc in policy['exclusions']:
+                    for exc in display['exclusions']:
                         st.markdown(f"- {exc.get('coverage', '')}: {', '.join(exc.get('conditions', []))}")
-                
-                # Raw JSON expander
+
+                # Sanitized JSON viewer (read-only)
                 with st.expander("📝 JSON גולמי"):
-                    st.json(policy)
-        
-        # Edit option
+                    st.json(display)
+
+        # Form-based editing
         st.divider()
         st.markdown("### ✏️ עריכת נתונים")
         st.caption("ניתן לערוך את הנתונים ידנית לפני יצירת תיק הביטוח")
-        
-        edited_json = st.text_area(
-            "JSON מלא (לעריכה)",
-            value=json.dumps(st.session_state.extracted_policies, indent=2, ensure_ascii=False),
-            height=300
-        )
-        
-        if st.button("💾 שמור שינויים"):
-            try:
-                st.session_state.extracted_policies = json.loads(edited_json)
-                st.success("✅ השינויים נשמרו!")
-            except json.JSONDecodeError as e:
-                st.error(f"❌ שגיאת JSON: {e}")
+
+        for i, policy in enumerate(st.session_state.extracted_policies):
+            with st.expander(f"📝 עריכת פוליסה {i+1}: {policy.get('_source_file', '')}"):
+                ec1, ec2 = st.columns(2)
+                with ec1:
+                    new_name = st.text_input(
+                        "שם מבוטח",
+                        value=policy.get('policyholder', {}).get('name', ''),
+                        key=f"edit_name_{i}",
+                    )
+                    new_pnum = st.text_input(
+                        "מספר פוליסה",
+                        value=policy.get('policy_number', ''),
+                        key=f"edit_pnum_{i}",
+                    )
+                with ec2:
+                    new_carrier = st.text_input(
+                        "חברת ביטוח",
+                        value=policy.get('carrier', {}).get('name', ''),
+                        key=f"edit_carrier_{i}",
+                    )
+                    new_premium = st.number_input(
+                        "פרמיה חודשית",
+                        value=float(policy.get('total_monthly_premium') or 0),
+                        key=f"edit_prem_{i}",
+                        format="%.2f",
+                        min_value=0.0,
+                    )
+
+                if st.button("💾 שמור שינויים", key=f"save_policy_{i}"):
+                    if 'policyholder' not in policy:
+                        policy['policyholder'] = {}
+                    policy['policyholder']['name'] = new_name
+                    policy['policy_number'] = new_pnum
+                    if 'carrier' not in policy:
+                        policy['carrier'] = {}
+                    policy['carrier']['name'] = new_carrier
+                    policy['total_monthly_premium'] = new_premium
+                    st.success("✅ השינויים נשמרו!")
+                    st.rerun()
 
 # ==================== TAB 3: Generate Portfolio ====================
 with tab3:
@@ -404,8 +454,9 @@ with tab3:
         if insurance_products:
             preview_data = []
             for prod in insurance_products:
+                display_member = prod['member_name'] if st.session_state.show_sensitive else mask_name(prod['member_name'])
                 preview_data.append({
-                    "מבוטח": prod['member_name'],
+                    "מבוטח": display_member,
                     "חברה": prod['company'],
                     "מוצר": prod['product_name'],
                     "פרמיה": f"₪{prod['premium']:,.2f}" if isinstance(prod['premium'], (int, float)) else prod['premium']
@@ -421,12 +472,23 @@ with tab3:
         # Generate button
         if st.button("📊 צור תיק ביטוח Excel", type="primary", use_container_width=True):
             with st.spinner("מייצר תיק ביטוח..."):
+                # Optionally mask PII in exports
+                export_products = insurance_products
+                export_members = family_members
+                if not st.session_state.show_sensitive:
+                    export_products = [
+                        {**p, "member_name": mask_name(p["member_name"])} for p in insurance_products
+                    ]
+                    export_members = [
+                        {**m, "name": mask_name(m["name"])} for m in family_members
+                    ]
+
                 # Prepare portfolio request
                 portfolio_request = {
                     "family_name": portfolio_family_name,
                     "report_date": str(report_date),
-                    "family_members": family_members,
-                    "insurance_products": insurance_products
+                    "family_members": export_members,
+                    "insurance_products": export_products,
                 }
                 
                 try:
@@ -464,41 +526,19 @@ with tab3:
                 except Exception as e:
                     st.error(f"❌ שגיאת חיבור: {str(e)}")
         
-        # Manual JSON input (collapsed)
+        # Manual JSON input (collapsed) — display sanitized when toggle is off
         with st.expander("🔧 הזנה ידנית (JSON)"):
             st.caption("למשתמשים מתקדמים - הזנת JSON ישירות")
-            
-            manual_json = st.text_area(
-                "Portfolio JSON",
-                value=json.dumps({
-                    "family_name": portfolio_family_name,
-                    "report_date": str(report_date),
-                    "family_members": family_members,
-                    "insurance_products": insurance_products
-                }, indent=2, ensure_ascii=False),
-                height=400
-            )
-            
-            if st.button("שלח JSON ידני"):
-                try:
-                    payload = json.loads(manual_json)
-                    response = requests.post(
-                        f"{backend_url}/generate_insurance_portfolio",
-                        json=payload,
-                        timeout=60
-                    )
-                    
-                    if response.status_code == 200:
-                        st.download_button(
-                            label="📥 הורד Excel",
-                            data=response.content,
-                            file_name=f"portfolio_{date.today()}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        )
-                    else:
-                        st.error(f"Error: {response.status_code}")
-                except Exception as e:
-                    st.error(str(e))
+
+            portfolio_payload = {
+                "family_name": portfolio_family_name,
+                "report_date": str(report_date),
+                "family_members": family_members,
+                "insurance_products": insurance_products,
+            }
+            display_payload = portfolio_payload if st.session_state.show_sensitive else sanitize_policy(portfolio_payload)
+
+            st.json(display_payload)
 
 # ==================== TAB 4: Compare Policies ====================
 with tab4:
@@ -512,9 +552,10 @@ with tab4:
         if st.button("🔍 השווה פוליסות", type="primary", use_container_width=True):
             with st.spinner("מבצע השוואה..."):
                 try:
+                    compare_data = st.session_state.extracted_policies
                     response = requests.post(
                         f"{backend_url}/compare_policies",
-                        json={"policies": st.session_state.extracted_policies},
+                        json={"policies": compare_data},
                         timeout=30
                     )
 
