@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import azure.functions as func
 from azure.core.exceptions import ResourceNotFoundError
@@ -62,7 +62,7 @@ def save_session(req: func.HttpRequest) -> func.HttpResponse:
 
     family_name = body.get("family_name", "")
     session_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     session_data = {
         "session_id": session_id,

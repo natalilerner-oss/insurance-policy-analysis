@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 def test_session_data_structure():
     """Verify the session data dict is built correctly."""
     import uuid
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     policies = [
         {"policy_number": "111", "carrier": {"name": "Harel"}},
@@ -22,7 +22,7 @@ def test_session_data_structure():
     ]
     family_name = "ישראלי"
     session_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     session_data = {
         "session_id": session_id,
