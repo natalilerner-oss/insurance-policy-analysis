@@ -149,8 +149,17 @@ def compare_policies(req: func.HttpRequest) -> func.HttpResponse:
         if not isinstance(policy, dict):
             continue
         label = policy_label(policy, idx)
+        # Deduplicate labels by appending a counter suffix
+        base_label = label
+        counter = 2
+        while label in policy_labels:
+            label = f"{base_label} #{counter}"
+            counter += 1
         policy_labels.append(label)
         total_premium = policy.get("total_monthly_premium") or 0
+        # If total_monthly_premium not set, calculate from coverages
+        if not total_premium and policy.get("coverages"):
+            total_premium = sum(coverage_premium(c) for c in policy["coverages"] if isinstance(c, dict))
         summary.append(
             {
                 "policy": label,

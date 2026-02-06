@@ -229,10 +229,18 @@ def _add_comparison_sheet(wb: Workbook, data: InsurancePortfolioRequest) -> None
     ws.sheet_view.rightToLeft = True
 
     policies: List[Tuple[str, InsuranceProduct]] = []
+    seen_labels: List[str] = []
     for idx, product in enumerate(data.insurance_products):
         label = product.policy_number or f"policy_{idx + 1}"
         if product.company:
             label += f" ({product.company})"
+        # Deduplicate labels by appending a counter suffix
+        base_label = label
+        counter = 2
+        while label in seen_labels:
+            label = f"{base_label} #{counter}"
+            counter += 1
+        seen_labels.append(label)
         policies.append((label, product))
 
     # Collect all unique coverage keys (normalized name or type)

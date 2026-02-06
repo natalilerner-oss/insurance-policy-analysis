@@ -6,6 +6,17 @@ from src.blueprints.utils import assign_request_id, get_memory_info, get_request
 VERSION = "3.1"
 bp = func.Blueprint()
 
+
+@bp.route(route="ping", methods=["GET"])
+def ping(req: func.HttpRequest) -> func.HttpResponse:
+    """Lightweight health check endpoint for keep-alive and uptime monitoring."""
+    return func.HttpResponse(
+        json.dumps({"status": "ok", "version": VERSION}),
+        status_code=200,
+        mimetype="application/json",
+    )
+
+
 @bp.route(route="health", methods=["GET"])
 def health(req: func.HttpRequest) -> func.HttpResponse:
     assign_request_id(req)
