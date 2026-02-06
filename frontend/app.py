@@ -102,11 +102,12 @@ with col2:
 st.divider()
 
 # Main workflow tabs
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📤 1. העלאת פוליסות",
     "📋 2. סקירת נתונים", 
     "📊 3. יצירת תיק ביטוח",
-    "🔍 4. השוואת פוליסות"
+    "🔍 4. השוואת פוליסות",
+    "🕐 5. חילוצים אחרונים"
 ])
 
 # ==================== TAB 1: Upload Policies ====================
@@ -253,6 +254,20 @@ with tab1:
                 st.balloons()
                 st.success(f"🎉 חולצו בהצלחה {len(extracted_policies)} פוליסות!")
                 st.info("👈 עבור ללשונית 'סקירת נתונים' לצפייה בתוצאות")
+
+                # Save session to backend
+                try:
+                    session_payload = {
+                        "family_name": st.session_state.family_name,
+                        "policies": extracted_policies,
+                    }
+                    requests.post(
+                        f"{backend_url}/sessions",
+                        json=session_payload,
+                        timeout=10,
+                    )
+                except Exception:
+                    pass  # Non-critical; don't block the user
 
 # ==================== TAB 2: Review Data ====================
 with tab2:
@@ -627,6 +642,60 @@ with tab4:
                         st.error(f"❌ שגיאה: {response.status_code} - {response.text}")
                 except Exception as e:
                     st.error(f"❌ שגיאת חיבור: {str(e)}")
+
+# ==================== TAB 5: Recent Sessions ====================
+with tab5:
+    st.header("חילוצים אחרונים")
+    st.markdown("צפייה בפוליסות שחולצו בעבר וטעינתן מחדש לעבודה.")
+
+    if st.button("🔄 רענן רשימה", key="refresh_sessions"):
+        pass  # button press triggers a rerun which fetches fresh data
+
+    try:
+        sessions_resp = requests.get(f"{backend_url}/sessions", timeout=10)
+        if sessions_resp.status_code == 200:
+            sessions_data = sessions_resp.json().get("sessions", [])
+            if not sessions_data:
+                st.info("📭 לא נמצאו חילוצים קודמים.")
+            else:
+                for sess in sessions_data:
+                    created = sess.get("created_at", "")
+                    try:
+                        dt = datetime.fromisoformat(created)
+                        display_date = dt.strftime("%Y-%m-%d %H:%M")
+                    except Exception:
+                        display_date = created
+
+                    family = sess.get("family_name") or "ללא שם"
+                    count = sess.get("policy_count", 0)
+                    sid = sess.get("session_id", "")
+
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    with col1:
+                        st.markdown(f"**{family}** — {display_date}")
+                    with col2:
+                        st.text(f"{count} פוליסות")
+                    with col3:
+                        if st.button("📂 טען", key=f"load_{sid}"):
+                            try:
+                                detail_resp = requests.get(
+                                    f"{backend_url}/sessions/{sid}",
+                                    timeout=10,
+                                )
+                                if detail_resp.status_code == 200:
+                                    detail = detail_resp.json()
+                                    st.session_state.extracted_policies = detail.get("policies", [])
+                                    st.session_state.family_name = detail.get("family_name", "")
+                                    st.success("✅ הנתונים נטענו בהצלחה!")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ שגיאה בטעינת החילוץ")
+                            except Exception as load_err:
+                                st.error(f"❌ שגיאה: {str(load_err)}")
+        else:
+            st.warning("⚠️ לא ניתן לטעון חילוצים אחרונים.")
+    except Exception:
+        st.info("📭 שירות החילוצים אינו זמין כרגע.")
 
 # Footer
 st.divider()
