@@ -32,3 +32,4 @@ class InsurancePortfolioRequest(BaseModel):
     report_date: date
     family_members: List[FamilyMember]
     insurance_products: List[InsuranceProduct]
+    recipient_email: Optional[str] = None
