@@ -94,11 +94,13 @@ st.markdown("""
                     url('https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1200') center/cover;
         border-radius: 16px;
         padding: 48px 40px;
-        margin: -1rem -1rem 2rem -1rem;
+        margin: 0 0 2rem 0;
         text-align: right;
         direction: rtl;
         position: relative;
         min-height: 200px;
+        box-sizing: border-box;
+        width: 100%;
     }
     .hero-section h1 {
         color: #ffffff;
@@ -358,6 +360,14 @@ st.markdown("""
         color: var(--di-primary);
     }
 
+    /* ===== LTR for English / URL inputs in sidebar ===== */
+    [data-testid="stSidebar"] .stTextInput input[value*="."],
+    [data-testid="stSidebar"] .stTextInput input[value*="http"],
+    [data-testid="stSidebar"] .stTextInput input[type="text"] {
+        direction: ltr;
+        text-align: left;
+    }
+
     /* ===== Divider ===== */
     hr {
         border-color: var(--di-border) !important;
@@ -412,17 +422,25 @@ st.markdown("""
 
     /* ===== Responsive Design ===== */
 
+    /* Global box-sizing */
+    *, *::before, *::after {
+        box-sizing: border-box;
+    }
+
     /* Prevent horizontal overflow globally */
-    .main .block-container {
+    html, body, [data-testid="stAppViewContainer"],
+    .main, .main .block-container {
         max-width: 100%;
+        overflow-x: hidden;
+    }
+    .main .block-container {
         padding-left: 1rem;
         padding-right: 1rem;
-        overflow-x: hidden;
     }
 
     /* Text overflow safety */
     .stMarkdown, .hero-section, .feature-card, .section-header,
-    .di-footer, .policy-card {
+    .di-footer, .policy-card, p, h1, h2, h3, h4, h5, h6, span, a, li {
         overflow-wrap: break-word;
         word-wrap: break-word;
     }
@@ -431,6 +449,20 @@ st.markdown("""
     img {
         max-width: 100%;
         height: auto;
+    }
+
+    /* Feature cards row responsive */
+    .feature-cards-row {
+        display: flex;
+        gap: 16px;
+        direction: rtl;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        width: 100%;
+    }
+    .feature-cards-row .feature-card {
+        flex: 1 1 280px;
+        min-width: 0;
     }
 
     /* Tabs horizontal scroll on small screens */
@@ -453,6 +485,9 @@ st.markdown("""
         .hero-section .hero-subtitle {
             font-size: 1rem;
         }
+        .feature-cards-row .feature-card {
+            flex: 1 1 240px;
+        }
         .feature-card {
             padding: 18px;
         }
@@ -465,6 +500,9 @@ st.markdown("""
         .stTabs [data-baseweb="tab"] {
             padding: 8px 14px;
             font-size: 0.9rem;
+        }
+        .stat-row {
+            flex-wrap: wrap;
         }
     }
 
@@ -493,10 +531,15 @@ st.markdown("""
         /* Stack feature cards vertically */
         .feature-cards-row {
             flex-direction: column !important;
+            gap: 12px;
+        }
+        .feature-cards-row .feature-card {
+            flex: 1 1 100%;
+            min-width: 0 !important;
+            width: 100%;
         }
         .feature-card {
             padding: 16px;
-            min-width: 100% !important;
         }
         .feature-card .card-icon {
             width: 40px;
@@ -531,12 +574,19 @@ st.markdown("""
         [data-testid="stMetric"] {
             padding: 12px 14px;
         }
+        .stat-row {
+            flex-direction: column;
+        }
         .stat-card .stat-value {
             font-size: 1.4rem;
         }
         .di-footer {
             font-size: 0.75rem;
             padding: 16px 0 4px 0;
+        }
+        /* Columns stacking */
+        [data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap;
         }
     }
 
@@ -566,7 +616,15 @@ if 'show_sensitive' not in st.session_state:
 
 # Sidebar Configuration
 with st.sidebar:
-    st.image("https://documentinsight.ai/logo.png", width=200)
+    try:
+        st.image("https://documentinsight.ai/logo.png", width=200)
+    except Exception:
+        st.markdown(
+            '<div style="direction:ltr;text-align:center;padding:12px 0;">'
+            '<span style="font-size:1.4rem;font-weight:700;color:#0056b3;">DocumentInsight.ai</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
     st.markdown("---")
     st.markdown('<div style="direction:rtl;text-align:right;"><h3 style="color:#0056b3;">הגדרות</h3></div>', unsafe_allow_html=True)
 
@@ -580,7 +638,13 @@ with st.sidebar:
         st.caption("מידע אישי מוסתר")
 
     st.divider()
-    st.markdown('<div style="direction:rtl;text-align:right;"><strong>DocumentInsight.ai</strong><br><span style="color:#6b7280;font-size:0.85rem;">From a junkyard of information to a gallery of Knowledge</span></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div style="direction:ltr;text-align:left;">'
+        '<strong>DocumentInsight.ai</strong><br>'
+        '<span style="color:#6b7280;font-size:0.85rem;">From a junkyard of information to a gallery of Knowledge</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 # Hero Section
 st.markdown("""
@@ -608,18 +672,18 @@ st.markdown("""
 
 # Feature cards row
 st.markdown("""
-<div class="feature-cards-row" style="display:flex; gap:16px; direction:rtl; margin-bottom:24px; flex-wrap:wrap;">
-    <div class="feature-card" style="flex:1; min-width:200px;">
+<div class="feature-cards-row">
+    <div class="feature-card">
         <div class="card-icon">&#128229;</div>
         <h3>קליטה אחידה</h3>
         <p>העלאת קבצי PDF, תמונות וסריקות. המערכת מנרמלת פורמטים ומבצעת OCR אוטומטי.</p>
     </div>
-    <div class="feature-card" style="flex:1; min-width:200px;">
+    <div class="feature-card">
         <div class="card-icon">&#128202;</div>
         <h3>מבנה שנשאר</h3>
         <p>פילוח, סיכום ותיוג תוכן כדי שהמידע יהיה ממוקד, נקי ומוכן לכל אסטרטגיית שליפה.</p>
     </div>
-    <div class="feature-card" style="flex:1; min-width:200px;">
+    <div class="feature-card">
         <div class="card-icon">&#128640;</div>
         <h3>ייצוא לכל מקום</h3>
         <p>ייצוא תיקי ביטוח נקיים ל-Excel, עם שמירה מלאה על מקוריות הנתונים.</p>
