@@ -13,7 +13,7 @@ import pandas as pd
 # Ensure sibling modules are importable regardless of cwd
 sys.path.insert(0, str(Path(__file__).parent))
 from sanitizer import (
-    mask_id_number, mask_name, mask_address,
+    mask_id_number, mask_name, mask_address, mask_phone, mask_email,
     sanitize_policy, sanitize_policies,
 )
 
@@ -409,6 +409,150 @@ st.markdown("""
         font-size: 0.9rem;
         margin-top: 4px;
     }
+
+    /* ===== Responsive Design ===== */
+
+    /* Prevent horizontal overflow globally */
+    .main .block-container {
+        max-width: 100%;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        overflow-x: hidden;
+    }
+
+    /* Text overflow safety */
+    .stMarkdown, .hero-section, .feature-card, .section-header,
+    .di-footer, .policy-card {
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+    }
+
+    /* Responsive images */
+    img {
+        max-width: 100%;
+        height: auto;
+    }
+
+    /* Tabs horizontal scroll on small screens */
+    .stTabs [data-baseweb="tab-list"] {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* ---- Tablet (<=900px) ---- */
+    @media (max-width: 900px) {
+        .hero-section {
+            padding: 32px 24px;
+            margin: 0 0 1.5rem 0;
+            border-radius: 12px;
+        }
+        .hero-section h1 {
+            font-size: 1.8rem;
+        }
+        .hero-section .hero-subtitle {
+            font-size: 1rem;
+        }
+        .feature-card {
+            padding: 18px;
+        }
+        .feature-card h3 {
+            font-size: 1.05rem;
+        }
+        .section-header h2 {
+            font-size: 1.35rem;
+        }
+        .stTabs [data-baseweb="tab"] {
+            padding: 8px 14px;
+            font-size: 0.9rem;
+        }
+    }
+
+    /* ---- Mobile (<=600px) ---- */
+    @media (max-width: 600px) {
+        .main .block-container {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+        .hero-section {
+            padding: 24px 16px;
+            margin: 0 0 1rem 0;
+            border-radius: 10px;
+            min-height: auto;
+        }
+        .hero-section h1 {
+            font-size: 1.5rem;
+        }
+        .hero-section .hero-subtitle {
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+        .hero-feature-item {
+            font-size: 0.85rem;
+        }
+        /* Stack feature cards vertically */
+        .feature-cards-row {
+            flex-direction: column !important;
+        }
+        .feature-card {
+            padding: 16px;
+            min-width: 100% !important;
+        }
+        .feature-card .card-icon {
+            width: 40px;
+            height: 40px;
+            font-size: 1.2rem;
+        }
+        .feature-card h3 {
+            font-size: 1rem;
+        }
+        .feature-card p {
+            font-size: 0.85rem;
+        }
+        .pill-badge {
+            font-size: 0.8rem;
+            padding: 5px 14px;
+        }
+        .section-header h2 {
+            font-size: 1.2rem;
+        }
+        .section-header p {
+            font-size: 0.85rem;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 4px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            padding: 6px 10px;
+            font-size: 0.8rem;
+            height: auto;
+            white-space: nowrap;
+        }
+        [data-testid="stMetric"] {
+            padding: 12px 14px;
+        }
+        .stat-card .stat-value {
+            font-size: 1.4rem;
+        }
+        .di-footer {
+            font-size: 0.75rem;
+            padding: 16px 0 4px 0;
+        }
+    }
+
+    /* ---- Small mobile (<=375px) ---- */
+    @media (max-width: 375px) {
+        .hero-section h1 {
+            font-size: 1.3rem;
+        }
+        .hero-section .hero-subtitle {
+            font-size: 0.8rem;
+        }
+        .stTabs [data-baseweb="tab"] {
+            padding: 5px 8px;
+            font-size: 0.75rem;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -464,7 +608,7 @@ st.markdown("""
 
 # Feature cards row
 st.markdown("""
-<div style="display:flex; gap:16px; direction:rtl; margin-bottom:24px; flex-wrap:wrap;">
+<div class="feature-cards-row" style="display:flex; gap:16px; direction:rtl; margin-bottom:24px; flex-wrap:wrap;">
     <div class="feature-card" style="flex:1; min-width:200px;">
         <div class="card-icon">&#128229;</div>
         <h3>קליטה אחידה</h3>
@@ -662,21 +806,22 @@ with tab2:
         # Summary cards
         total_premium = 0
         all_members = set()
-        
+
         for policy in st.session_state.extracted_policies:
             if 'total_monthly_premium' in policy:
                 total_premium += policy.get('total_monthly_premium') or 0
             if 'policyholder' in policy and 'name' in policy['policyholder']:
-                all_members.add(policy['policyholder']['name'])
-        
+                raw_name = policy['policyholder']['name']
+                all_members.add(mask_name(raw_name) if not st.session_state.show_sensitive else raw_name)
+
         # Summary row
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("📋 פוליסות", len(st.session_state.extracted_policies))
+            st.metric("פוליסות", len(st.session_state.extracted_policies))
         with col2:
-            st.metric("👥 מבוטחים", len(all_members))
+            st.metric("מבוטחים", len(all_members))
         with col3:
-            st.metric("💰 סה״כ פרמיה חודשית", f"₪{total_premium:,.2f}")
+            st.metric("סה״כ פרמיה חודשית", f"₪{total_premium:,.2f}")
         
         st.divider()
         
@@ -737,17 +882,25 @@ with tab2:
 
         # Form-based editing
         st.divider()
-        st.markdown("### ✏️ עריכת נתונים")
-        st.caption("ניתן לערוך את הנתונים ידנית לפני יצירת תיק הביטוח")
+        st.markdown('<div class="section-header"><h2>עריכת נתונים</h2><p>ניתן לערוך את הנתונים ידנית לפני יצירת תיק הביטוח</p></div>', unsafe_allow_html=True)
+
+        if not st.session_state.show_sensitive:
+            st.info("להצגת ועריכת הנתונים המלאים, הפעל את מתג 'הצג מידע רגיש' בסרגל הצד.")
 
         for i, policy in enumerate(st.session_state.extracted_policies):
-            with st.expander(f"📝 עריכת פוליסה {i+1}: {policy.get('_source_file', '')}"):
+            with st.expander(f"עריכת פוליסה {i+1}: {policy.get('_source_file', '')}"):
+                # Determine display values based on sensitive toggle
+                raw_name = policy.get('policyholder', {}).get('name', '')
+                display_name = raw_name if st.session_state.show_sensitive else mask_name(raw_name)
+                raw_carrier = policy.get('carrier', {}).get('name', '')
+
                 ec1, ec2 = st.columns(2)
                 with ec1:
                     new_name = st.text_input(
                         "שם מבוטח",
-                        value=policy.get('policyholder', {}).get('name', ''),
+                        value=display_name,
                         key=f"edit_name_{i}",
+                        disabled=not st.session_state.show_sensitive,
                     )
                     new_pnum = st.text_input(
                         "מספר פוליסה",
@@ -757,7 +910,7 @@ with tab2:
                 with ec2:
                     new_carrier = st.text_input(
                         "חברת ביטוח",
-                        value=policy.get('carrier', {}).get('name', ''),
+                        value=raw_carrier,
                         key=f"edit_carrier_{i}",
                     )
                     new_premium = st.number_input(
@@ -768,16 +921,18 @@ with tab2:
                         min_value=0.0,
                     )
 
-                if st.button("💾 שמור שינויים", key=f"save_policy_{i}"):
+                if st.button("שמור שינויים", key=f"save_policy_{i}"):
                     if 'policyholder' not in policy:
                         policy['policyholder'] = {}
-                    policy['policyholder']['name'] = new_name
+                    # Only update name if sensitive is on (field was editable)
+                    if st.session_state.show_sensitive:
+                        policy['policyholder']['name'] = new_name
                     policy['policy_number'] = new_pnum
                     if 'carrier' not in policy:
                         policy['carrier'] = {}
                     policy['carrier']['name'] = new_carrier
                     policy['total_monthly_premium'] = new_premium
-                    st.success("✅ השינויים נשמרו!")
+                    st.success("השינויים נשמרו!")
                     st.rerun()
 
 # ==================== TAB 3: Generate Portfolio ====================
@@ -978,7 +1133,7 @@ with tab4:
     else:
         st.markdown("בחר להשוות את הכיסויים והפרמיות בין הפוליסות שחולצו.")
 
-        if st.button("🔍 השווה פוליסות", type="primary", use_container_width=True):
+        if st.button("השווה פוליסות", type="primary", use_container_width=True):
             with st.spinner("מבצע השוואה..."):
                 try:
                     compare_data = st.session_state.extracted_policies
@@ -990,7 +1145,10 @@ with tab4:
 
                     if response.status_code == 200:
                         result = response.json()
-                        st.success("✅ ההשוואה הושלמה")
+                        # Sanitize comparison result when sensitive toggle is off
+                        if not st.session_state.show_sensitive:
+                            result = sanitize_policy(result)
+                        st.success("ההשוואה הושלמה")
 
                         summary = result.get("policies", [])
                         if summary:
@@ -1006,15 +1164,15 @@ with tab4:
                                 df = df.reindex(columns=columns)
                             st.dataframe(df, use_container_width=True)
                     else:
-                        st.error(f"❌ שגיאה: {response.status_code} - {response.text}")
+                        st.error(f"שגיאה: {response.status_code} - {response.text}")
                 except Exception as e:
-                    st.error(f"❌ שגיאת חיבור: {str(e)}")
+                    st.error(f"שגיאת חיבור: {str(e)}")
 
 # ==================== TAB 5: Recent Sessions ====================
 with tab5:
     st.markdown('<div class="section-header"><h2>חילוצים אחרונים</h2><p>צפייה בפוליסות שחולצו בעבר וטעינתן מחדש לעבודה.</p></div>', unsafe_allow_html=True)
 
-    if st.button("🔄 רענן רשימה", key="refresh_sessions"):
+    if st.button("רענן רשימה", key="refresh_sessions"):
         pass  # button press triggers a rerun which fetches fresh data
 
     try:
@@ -1022,7 +1180,7 @@ with tab5:
         if sessions_resp.status_code == 200:
             sessions_data = sessions_resp.json().get("sessions", [])
             if not sessions_data:
-                st.info("📭 לא נמצאו חילוצים קודמים.")
+                st.info("לא נמצאו חילוצים קודמים.")
             else:
                 for sess in sessions_data:
                     created = sess.get("created_at", "")
@@ -1032,7 +1190,8 @@ with tab5:
                     except Exception:
                         display_date = created
 
-                    family = sess.get("family_name") or "ללא שם"
+                    raw_family = sess.get("family_name") or "ללא שם"
+                    family = raw_family if st.session_state.show_sensitive else mask_name(raw_family)
                     count = sess.get("policy_count", 0)
                     sid = sess.get("session_id", "")
 
@@ -1042,7 +1201,7 @@ with tab5:
                     with col2:
                         st.text(f"{count} פוליסות")
                     with col3:
-                        if st.button("📂 טען", key=f"load_{sid}"):
+                        if st.button("טען", key=f"load_{sid}"):
                             try:
                                 detail_resp = requests.get(
                                     f"{backend_url}/sessions/{sid}",
