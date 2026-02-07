@@ -33,34 +33,381 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for RTL support and better styling
+# Custom CSS: DocumentInsight.ai-inspired design with full RTL Hebrew support
 st.markdown("""
 <style>
-    .rtl-text { direction: rtl; text-align: right; }
-    .policy-card {
-        background-color: #f8f9fa;
-        border-radius: 10px;
-        padding: 15px;
-        margin: 10px 0;
-        border-left: 4px solid #4F46E5;
+    /* ===== Global RTL Direction ===== */
+    .main .block-container, .stMarkdown, .stTextInput, .stNumberInput,
+    .stSelectbox, .stMultiselect, .stCheckbox, .stRadio, .stDateInput,
+    .stFileUploader, .stExpander, .stDataFrame {
+        direction: rtl;
+        text-align: right;
     }
+    /* Force RTL on all Streamlit elements */
+    [data-testid="stAppViewContainer"] {
+        direction: rtl;
+    }
+    [data-testid="stSidebar"] {
+        direction: rtl;
+        text-align: right;
+    }
+    [data-testid="stSidebar"] .stMarkdown,
+    [data-testid="stSidebar"] .stTextInput {
+        direction: rtl;
+        text-align: right;
+    }
+    /* Input fields RTL */
+    .stTextInput input, .stNumberInput input, .stTextArea textarea {
+        direction: rtl;
+        text-align: right;
+    }
+    /* Labels RTL */
+    .stTextInput label, .stNumberInput label, .stSelectbox label,
+    .stFileUploader label, .stCheckbox label, .stDateInput label,
+    .stTextArea label {
+        direction: rtl;
+        text-align: right;
+        width: 100%;
+    }
+
+    /* ===== Color Palette & Typography ===== */
+    :root {
+        --di-primary: #0056b3;
+        --di-primary-dark: #003d82;
+        --di-teal: #17a2b8;
+        --di-gradient: linear-gradient(90deg, #17a2b8, #0056b3);
+        --di-bg: #f8fafc;
+        --di-card-bg: #ffffff;
+        --di-text: #374151;
+        --di-text-light: #6b7280;
+        --di-border: #e5eaf0;
+        --di-icon-bg: #eef6ff;
+        --di-icon-color: #0b63c5;
+        --di-success: #10B981;
+        --di-shadow: 0 6px 24px rgba(0,0,0,0.08);
+        --di-shadow-hover: 0 10px 32px rgba(0,0,0,0.12);
+    }
+
+    /* ===== Hero Section ===== */
+    .hero-section {
+        background: linear-gradient(135deg, rgba(0,86,179,0.85), rgba(23,162,184,0.85)),
+                    url('https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1200') center/cover;
+        border-radius: 16px;
+        padding: 48px 40px;
+        margin: -1rem -1rem 2rem -1rem;
+        text-align: right;
+        direction: rtl;
+        position: relative;
+        min-height: 200px;
+    }
+    .hero-section h1 {
+        color: #ffffff;
+        font-size: 2.4rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+        letter-spacing: 0.01em;
+    }
+    .hero-section .hero-subtitle {
+        color: rgba(255,255,255,0.9);
+        font-size: 1.15rem;
+        margin-bottom: 20px;
+        line-height: 1.6;
+    }
+    .hero-features {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 16px;
+    }
+    .hero-feature-item {
+        color: rgba(255,255,255,0.95);
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        direction: rtl;
+    }
+    .hero-feature-item .icon {
+        color: #7dd3fc;
+        font-size: 1.1rem;
+    }
+
+    /* ===== Pill Badge ===== */
+    .pill-badge {
+        display: inline-block;
+        background: linear-gradient(90deg, #17a2b8, #0056b3);
+        color: #ffffff;
+        padding: 6px 20px;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        margin-bottom: 12px;
+    }
+
+    /* ===== Feature Cards ===== */
+    .feature-card {
+        background: var(--di-card-bg);
+        border: 1px solid var(--di-border);
+        border-radius: 14px;
+        padding: 24px;
+        box-shadow: var(--di-shadow);
+        transition: transform 0.2s, box-shadow 0.2s;
+        direction: rtl;
+        text-align: right;
+        height: 100%;
+    }
+    .feature-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--di-shadow-hover);
+    }
+    .feature-card .card-icon {
+        width: 52px;
+        height: 52px;
+        background: var(--di-icon-bg);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+        font-size: 1.5rem;
+        color: var(--di-icon-color);
+    }
+    .feature-card h3 {
+        color: var(--di-primary);
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .feature-card p {
+        color: var(--di-text-light);
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+
+    /* ===== Section Headers ===== */
+    .section-header {
+        direction: rtl;
+        text-align: right;
+        margin-bottom: 24px;
+    }
+    .section-header h2 {
+        color: var(--di-primary);
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+    }
+    .section-header p {
+        color: var(--di-text-light);
+        font-size: 1rem;
+        margin-top: 4px;
+    }
+
+    /* ===== Policy Card (Data Display) ===== */
+    .policy-card {
+        background-color: var(--di-card-bg);
+        border-radius: 14px;
+        padding: 20px;
+        margin: 12px 0;
+        border-right: 4px solid var(--di-primary);
+        border-left: none;
+        box-shadow: var(--di-shadow);
+        direction: rtl;
+        text-align: right;
+    }
+
+    /* ===== Premium Highlight ===== */
     .premium-highlight {
         font-size: 1.5em;
-        color: #10B981;
+        color: var(--di-success);
         font-weight: bold;
     }
+
+    /* ===== Coverage Item ===== */
     .coverage-item {
-        background-color: #EEF2FF;
-        padding: 8px 12px;
-        border-radius: 5px;
-        margin: 5px 0;
+        background-color: var(--di-icon-bg);
+        padding: 10px 14px;
+        border-radius: 8px;
+        margin: 6px 0;
+        direction: rtl;
+        text-align: right;
     }
+
+    /* ===== Tabs Styling ===== */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 24px;
+        gap: 8px;
+        direction: rtl;
+        justify-content: flex-start;
+        border-bottom: 2px solid var(--di-border);
+        padding-bottom: 0;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 50px;
+        height: 48px;
         padding: 10px 20px;
+        border-radius: 10px 10px 0 0;
+        font-weight: 600;
+        color: var(--di-text-light);
+        background: transparent;
+        border: none;
+        direction: rtl;
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        color: var(--di-primary);
+        background: var(--di-card-bg);
+        border-bottom: 3px solid var(--di-primary);
+    }
+
+    /* ===== Metric Cards ===== */
+    [data-testid="stMetric"] {
+        background: var(--di-card-bg);
+        border: 1px solid var(--di-border);
+        border-radius: 14px;
+        padding: 16px 20px;
+        box-shadow: var(--di-shadow);
+        direction: rtl;
+        text-align: right;
+    }
+    [data-testid="stMetricLabel"] {
+        direction: rtl;
+        text-align: right;
+    }
+    [data-testid="stMetricValue"] {
+        color: var(--di-primary);
+        font-weight: 700;
+    }
+
+    /* ===== Buttons ===== */
+    .stButton > button[kind="primary"],
+    .stButton > button[data-testid="baseButton-primary"] {
+        background: linear-gradient(90deg, #17a2b8, #0056b3) !important;
+        border: none !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        padding: 12px 24px !important;
+        font-size: 1rem !important;
+        transition: transform 0.2s, box-shadow 0.2s !important;
+    }
+    .stButton > button[kind="primary"]:hover,
+    .stButton > button[data-testid="baseButton-primary"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(0,86,179,0.3) !important;
+    }
+    .stButton > button {
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        border: 1px solid var(--di-border) !important;
+    }
+
+    /* ===== Expander RTL ===== */
+    .streamlit-expanderHeader {
+        direction: rtl;
+        text-align: right;
+    }
+    [data-testid="stExpander"] {
+        border: 1px solid var(--di-border);
+        border-radius: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    /* ===== File Uploader ===== */
+    [data-testid="stFileUploader"] {
+        direction: rtl;
+        text-align: right;
+    }
+    [data-testid="stFileUploader"] section {
+        border: 2px dashed var(--di-border);
+        border-radius: 14px;
+        background: var(--di-card-bg);
+    }
+
+    /* ===== Data frames RTL ===== */
+    .stDataFrame {
+        direction: rtl;
+    }
+
+    /* ===== Footer ===== */
+    .di-footer {
+        text-align: center;
+        color: var(--di-text-light);
+        padding: 24px 0 8px 0;
+        font-size: 0.85rem;
+        direction: rtl;
+    }
+    .di-footer a {
+        color: var(--di-primary);
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .di-footer a:hover {
+        text-decoration: underline;
+    }
+    .di-footer .footer-brand {
+        font-size: 0.95rem;
+        margin-bottom: 4px;
+    }
+
+    /* ===== Sidebar Styling ===== */
+    [data-testid="stSidebar"] {
+        background: var(--di-card-bg);
+        border-left: 1px solid var(--di-border);
+        border-right: none;
+    }
+    [data-testid="stSidebar"] .stMarkdown h1,
+    [data-testid="stSidebar"] .stMarkdown h2,
+    [data-testid="stSidebar"] .stMarkdown h3 {
+        color: var(--di-primary);
+    }
+
+    /* ===== Divider ===== */
+    hr {
+        border-color: var(--di-border) !important;
+    }
+
+    /* ===== Info/Warning/Error boxes RTL ===== */
+    .stAlert {
+        direction: rtl;
+        text-align: right;
+    }
+
+    /* ===== Download button ===== */
+    .stDownloadButton > button {
+        background: linear-gradient(90deg, #17a2b8, #0056b3) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+    }
+
+    /* ===== Columns RTL fix ===== */
+    [data-testid="stHorizontalBlock"] {
+        direction: rtl;
+    }
+
+    /* ===== Stat row ===== */
+    .stat-row {
+        display: flex;
+        gap: 16px;
+        direction: rtl;
+        margin-bottom: 24px;
+    }
+    .stat-card {
+        flex: 1;
+        background: var(--di-card-bg);
+        border: 1px solid var(--di-border);
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: var(--di-shadow);
+        text-align: center;
+    }
+    .stat-card .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--di-primary);
+    }
+    .stat-card .stat-label {
+        color: var(--di-text-light);
+        font-size: 0.9rem;
+        margin-top: 4px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -76,44 +423,80 @@ if 'show_sensitive' not in st.session_state:
 # Sidebar Configuration
 with st.sidebar:
     st.image("https://documentinsight.ai/logo.png", width=200)
-    st.header("⚙️ הגדרות")
+    st.markdown("---")
+    st.markdown('<div style="direction:rtl;text-align:right;"><h3 style="color:#0056b3;">הגדרות</h3></div>', unsafe_allow_html=True)
 
     default_url = os.getenv("BACKEND_URL", "http://localhost:7071/api")
     backend_url = st.text_input("Backend URL", value=default_url)
 
     st.divider()
-    show_sensitive = st.toggle("🔓 הצג מידע רגיש", value=st.session_state.show_sensitive)
+    show_sensitive = st.toggle("הצג מידע רגיש", value=st.session_state.show_sensitive)
     st.session_state.show_sensitive = show_sensitive
     if not show_sensitive:
-        st.caption("🔒 מידע אישי מוסתר")
+        st.caption("מידע אישי מוסתר")
 
     st.divider()
-    st.markdown("**DocumentInsight.ai**")
-    st.caption("From a junkyard of information to a gallery of Knowledge")
+    st.markdown('<div style="direction:rtl;text-align:right;"><strong>DocumentInsight.ai</strong><br><span style="color:#6b7280;font-size:0.85rem;">From a junkyard of information to a gallery of Knowledge</span></div>', unsafe_allow_html=True)
 
-# Header
-col1, col2 = st.columns([1, 4])
-with col1:
-    st.markdown("# 🔍")
-with col2:
-    st.title("PolicyLens")
-    st.caption("מערכת חכמה לחילוץ וניהול פוליסות ביטוח")
+# Hero Section
+st.markdown("""
+<div class="hero-section">
+    <h1>PolicyLens</h1>
+    <div class="hero-subtitle">
+        מערכת חכמה לחילוץ וניהול פוליסות ביטוח — מונעת בינה מלאכותית
+    </div>
+    <div class="hero-features">
+        <div class="hero-feature-item">
+            <span class="icon">&#9650;</span>
+            <span>העלאה אוטומטית של קבצי PDF, תמונות וסריקות</span>
+        </div>
+        <div class="hero-feature-item">
+            <span class="icon">&#9776;</span>
+            <span>חילוץ נתונים חכם, פילוח והעשרה למסד ידע מובנה</span>
+        </div>
+        <div class="hero-feature-item">
+            <span class="icon">&#10148;</span>
+            <span>ייצוא תיקי ביטוח נקיים ומוכנים לעבודה</span>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-st.divider()
+# Feature cards row
+st.markdown("""
+<div style="display:flex; gap:16px; direction:rtl; margin-bottom:24px; flex-wrap:wrap;">
+    <div class="feature-card" style="flex:1; min-width:200px;">
+        <div class="card-icon">&#128229;</div>
+        <h3>קליטה אחידה</h3>
+        <p>העלאת קבצי PDF, תמונות וסריקות. המערכת מנרמלת פורמטים ומבצעת OCR אוטומטי.</p>
+    </div>
+    <div class="feature-card" style="flex:1; min-width:200px;">
+        <div class="card-icon">&#128202;</div>
+        <h3>מבנה שנשאר</h3>
+        <p>פילוח, סיכום ותיוג תוכן כדי שהמידע יהיה ממוקד, נקי ומוכן לכל אסטרטגיית שליפה.</p>
+    </div>
+    <div class="feature-card" style="flex:1; min-width:200px;">
+        <div class="card-icon">&#128640;</div>
+        <h3>ייצוא לכל מקום</h3>
+        <p>ייצוא תיקי ביטוח נקיים ל-Excel, עם שמירה מלאה על מקוריות הנתונים.</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-# Main workflow tabs
+# Workflow pill badge + tabs
+st.markdown('<div style="text-align:center; margin-bottom:8px;"><span class="pill-badge">מוכן לעבודה עם AI</span></div>', unsafe_allow_html=True)
+
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📤 1. העלאת פוליסות",
-    "📋 2. סקירת נתונים", 
-    "📊 3. יצירת תיק ביטוח",
-    "🔍 4. השוואת פוליסות",
-    "🕐 5. חילוצים אחרונים"
+    "1. העלאת פוליסות",
+    "2. סקירת נתונים",
+    "3. יצירת תיק ביטוח",
+    "4. השוואת פוליסות",
+    "5. חילוצים אחרונים"
 ])
 
 # ==================== TAB 1: Upload Policies ====================
 with tab1:
-    st.header("העלאת מסמכי פוליסה")
-    st.markdown("העלה קבצי PDF או תמונות של פוליסות ביטוח. המערכת תחליץ את הנתונים באופן אוטומטי.")
+    st.markdown('<div class="section-header"><h2>העלאת מסמכי פוליסה</h2><p>העלה קבצי PDF או תמונות של פוליסות ביטוח. המערכת תחליץ את הנתונים באופן אוטומטי.</p></div>', unsafe_allow_html=True)
     
     # Family name input
     family_name = st.text_input(
@@ -271,7 +654,7 @@ with tab1:
 
 # ==================== TAB 2: Review Data ====================
 with tab2:
-    st.header("סקירת נתונים שחולצו")
+    st.markdown('<div class="section-header"><h2>סקירת נתונים שחולצו</h2></div>', unsafe_allow_html=True)
     
     if not st.session_state.extracted_policies:
         st.warning("⚠️ לא נמצאו פוליסות. העלה קבצים בלשונית הראשונה.")
@@ -399,7 +782,7 @@ with tab2:
 
 # ==================== TAB 3: Generate Portfolio ====================
 with tab3:
-    st.header("יצירת תיק ביטוח משפחתי")
+    st.markdown('<div class="section-header"><h2>יצירת תיק ביטוח משפחתי</h2></div>', unsafe_allow_html=True)
     
     if not st.session_state.extracted_policies:
         st.warning("⚠️ לא נמצאו פוליסות. העלה קבצים בלשונית הראשונה.")
@@ -588,7 +971,7 @@ with tab3:
 
 # ==================== TAB 4: Compare Policies ====================
 with tab4:
-    st.header("השוואת פוליסות")
+    st.markdown('<div class="section-header"><h2>השוואת פוליסות</h2></div>', unsafe_allow_html=True)
 
     if not st.session_state.extracted_policies:
         st.warning("⚠️ לא נמצאו פוליסות. העלה קבצים בלשונית הראשונה.")
@@ -629,8 +1012,7 @@ with tab4:
 
 # ==================== TAB 5: Recent Sessions ====================
 with tab5:
-    st.header("חילוצים אחרונים")
-    st.markdown("צפייה בפוליסות שחולצו בעבר וטעינתן מחדש לעבודה.")
+    st.markdown('<div class="section-header"><h2>חילוצים אחרונים</h2><p>צפייה בפוליסות שחולצו בעבר וטעינתן מחדש לעבודה.</p></div>', unsafe_allow_html=True)
 
     if st.button("🔄 רענן רשימה", key="refresh_sessions"):
         pass  # button press triggers a rerun which fetches fresh data
@@ -682,10 +1064,19 @@ with tab5:
         st.info("📭 שירות החילוצים אינו זמין כרגע.")
 
 # Footer
-st.divider()
+st.markdown("---")
 st.markdown("""
-<div style="text-align: center; color: #666; font-size: 0.8em;">
-    <p>PolicyLens by <a href="https://documentinsight.ai">DocumentInsight.ai</a></p>
-    <p>Stop searching, start knowing 🔍</p>
+<div class="di-footer">
+    <div class="footer-brand">
+        <strong>PolicyLens</strong> by <a href="https://documentinsight.ai">DocumentInsight.ai</a>
+    </div>
+    <div style="margin-top:4px;">
+        <span style="background:linear-gradient(90deg,#17a2b8,#0056b3);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:600;">
+            Stop searching, start knowing
+        </span>
+    </div>
+    <div style="margin-top:8px;color:#9ca3af;font-size:0.8rem;">
+        &copy; 2024 DocumentInsight.ai — כל הזכויות שמורות
+    </div>
 </div>
 """, unsafe_allow_html=True)
