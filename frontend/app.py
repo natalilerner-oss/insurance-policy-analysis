@@ -496,36 +496,9 @@ with tab3:
         
         # Generate button
         if st.button("📊 צור תיק ביטוח Excel", type="primary", use_container_width=True):
-            with st.spinner("מייצר תיק ביטוח..."):
-                # Optionally mask PII in exports
-                export_products = insurance_products
-                export_members = family_members
-                if not st.session_state.show_sensitive:
-                    export_products = [
-                        {**p, "member_name": mask_name(p["member_name"])} for p in insurance_products
-                    ]
-                    export_members = [
-                        {**m, "name": mask_name(m["name"])} for m in family_members
-                    ]
-
-                # Prepare portfolio request
-                portfolio_request = {
-                    "family_name": portfolio_family_name,
-                    "report_date": str(report_date),
-                    "family_members": export_members,
-                    "insurance_products": export_products,
-                }
-                
-                try:
-                    response = requests.post(
-                        f"{backend_url}/generate_insurance_portfolio",
-                        json=portfolio_request,
-                        timeout=60
-                    )
             # Email validation if send_email is checked
             email_valid = True
             if send_email and recipient_email:
-                # Basic but more robust email validation
                 import re
                 email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
                 if not re.match(email_pattern, recipient_email):
@@ -534,42 +507,53 @@ with tab3:
             elif send_email and not recipient_email:
                 st.error("❌ נא להזין כתובת מייל")
                 email_valid = False
-            
+
             if not send_email or email_valid:
                 with st.spinner("מייצר תיק ביטוח..."):
+                    # Optionally mask PII in exports
+                    export_products = insurance_products
+                    export_members = family_members
+                    if not st.session_state.show_sensitive:
+                        export_products = [
+                            {**p, "member_name": mask_name(p["member_name"])} for p in insurance_products
+                        ]
+                        export_members = [
+                            {**m, "name": mask_name(m["name"])} for m in family_members
+                        ]
+
                     # Prepare portfolio request
                     portfolio_request = {
                         "family_name": portfolio_family_name,
                         "report_date": str(report_date),
-                        "family_members": family_members,
-                        "insurance_products": insurance_products
+                        "family_members": export_members,
+                        "insurance_products": export_products,
                     }
-                    
+
                     # Add email if provided
                     if send_email and recipient_email:
                         portfolio_request["recipient_email"] = recipient_email
-                    
+
                     try:
                         response = requests.post(
                             f"{backend_url}/generate_insurance_portfolio",
                             json=portfolio_request,
                             timeout=60
                         )
-                        
+
                         if response.status_code == 200:
                             content_type = response.headers.get('Content-Type', '')
-                            
+
                             if 'application/json' in content_type:
                                 result = response.json()
                                 st.success("✅ תיק הביטוח נוצר בהצלחה!")
-                                
+
                                 # Show email confirmation if email was sent
                                 if send_email and recipient_email:
                                     st.info(f"📧 קישור ההורדה נשלח למייל: {recipient_email}")
-                                
+
                                 if 'downloadUrl' in result:
                                     st.markdown(f"### [📥 הורד את תיק הביטוח]({result['downloadUrl']})")
-                                
+
                                 if 'summary' in result:
                                     st.json(result['summary'])
                             else:
@@ -584,7 +568,7 @@ with tab3:
                                 )
                         else:
                             st.error(f"❌ שגיאה: {response.status_code} - {response.text}")
-                            
+
                     except Exception as e:
                         st.error(f"❌ שגיאת חיבור: {str(e)}")
         
