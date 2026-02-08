@@ -5,6 +5,8 @@ from src.blueprints.translation import bp as translation_bp
 from src.blueprints.portfolio import bp as portfolio_bp
 from src.blueprints.health import bp as health_bp
 from src.blueprints.sessions import bp as sessions_bp
+from src.blueprints.chat import bp as chat_bp
+from src.blueprints.search import bp as search_bp
 from src.azure_clients import validate_app_configuration
 
 # Validate configuration on startup
@@ -22,4 +24,6 @@ app.register_functions(translation_bp)
 app.register_functions(portfolio_bp)
 app.register_functions(health_bp)
 app.register_functions(sessions_bp)
+app.register_functions(chat_bp)
+app.register_functions(search_bp)
 

@@ -368,6 +368,134 @@ st.markdown("""
         text-align: left;
     }
 
+    /* ===== Chat Widget ===== */
+    .chat-container {
+        background: var(--di-card-bg);
+        border: 1px solid var(--di-border);
+        border-radius: 14px;
+        box-shadow: var(--di-shadow);
+        overflow: hidden;
+        direction: rtl;
+    }
+    .chat-header {
+        background: linear-gradient(135deg, #1e5a8e 0%, #0891b2 100%);
+        color: white;
+        padding: 15px 20px;
+        font-weight: bold;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        direction: rtl;
+    }
+    .chat-messages {
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: #f9fafb;
+    }
+    .chat-msg {
+        max-width: 80%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        word-wrap: break-word;
+    }
+    .chat-msg.user {
+        background: #e3f2fd;
+        align-self: flex-end;
+        border-bottom-left: 4px;
+        text-align: right;
+        direction: auto;
+    }
+    .chat-msg.assistant {
+        background: var(--di-card-bg);
+        border: 1px solid var(--di-border);
+        align-self: flex-start;
+        border-bottom-right: 4px;
+        direction: auto;
+    }
+    .chat-empty {
+        text-align: center;
+        color: var(--di-text-light);
+        padding: 40px 20px;
+        font-size: 0.95rem;
+    }
+    .chat-suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 12px;
+        direction: rtl;
+    }
+    .chat-suggestion {
+        background: var(--di-icon-bg);
+        color: var(--di-icon-color);
+        border: 1px solid var(--di-border);
+        border-radius: 20px;
+        padding: 6px 14px;
+        font-size: 0.85rem;
+        cursor: pointer;
+    }
+
+    /* ===== Search Components ===== */
+    .search-results-card {
+        background: var(--di-card-bg);
+        border: 1px solid var(--di-border);
+        border-radius: 14px;
+        padding: 16px 20px;
+        margin: 8px 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        direction: rtl;
+        text-align: right;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .search-results-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--di-shadow);
+    }
+    .search-results-card .result-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .search-results-card .result-policy-num {
+        font-weight: 700;
+        color: var(--di-primary);
+        font-size: 1.05rem;
+    }
+    .search-results-card .result-carrier {
+        color: var(--di-text-light);
+        font-size: 0.9rem;
+    }
+    .search-results-card .result-details {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-size: 0.9rem;
+        color: var(--di-text);
+    }
+    .search-results-card .result-tag {
+        background: var(--di-icon-bg);
+        color: var(--di-icon-color);
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        display: inline-block;
+        margin: 2px;
+    }
+    .search-no-results {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--di-text-light);
+    }
+
     /* ===== Divider ===== */
     hr {
         border-color: var(--di-border) !important;
@@ -613,6 +741,10 @@ if 'family_name' not in st.session_state:
     st.session_state.family_name = ""
 if 'show_sensitive' not in st.session_state:
     st.session_state.show_sensitive = False
+if 'chat_messages' not in st.session_state:
+    st.session_state.chat_messages = []
+if 'search_results' not in st.session_state:
+    st.session_state.search_results = None
 
 # Sidebar Configuration
 with st.sidebar:
@@ -694,12 +826,14 @@ st.markdown("""
 # Workflow pill badge + tabs
 st.markdown('<div style="text-align:center; margin-bottom:8px;"><span class="pill-badge">מוכן לעבודה עם AI</span></div>', unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "1. העלאת פוליסות",
     "2. סקירת נתונים",
     "3. יצירת תיק ביטוח",
     "4. השוואת פוליסות",
-    "5. חילוצים אחרונים"
+    "5. חילוצים אחרונים",
+    "6. חיפוש",
+    "7. צ'אט"
 ])
 
 # ==================== TAB 1: Upload Policies ====================
@@ -1285,6 +1419,224 @@ with tab5:
             st.warning("⚠️ לא ניתן לטעון חילוצים אחרונים.")
     except Exception:
         st.info("📭 שירות החילוצים אינו זמין כרגע.")
+
+# ==================== TAB 6: Search ====================
+with tab6:
+    st.markdown('<div class="section-header"><h2>חיפוש בפוליסות</h2><p>חפש לפי מספר פוליסה, חברת ביטוח, סוג כיסוי או טקסט חופשי.</p></div>', unsafe_allow_html=True)
+
+    if not st.session_state.extracted_policies:
+        st.warning("לא נמצאו פוליסות. העלה קבצים בלשונית הראשונה.")
+    else:
+        # Search input
+        search_query = st.text_input(
+            "חיפוש",
+            placeholder="חיפוש בפוליסות...",
+            key="search_query_input",
+            label_visibility="collapsed",
+        )
+
+        # Filters row
+        fc1, fc2, fc3, fc4 = st.columns(4)
+
+        # Gather unique carriers for dropdown
+        carriers = set()
+        coverage_types_set = set()
+        for p in st.session_state.extracted_policies:
+            c = p.get("carrier", {})
+            if isinstance(c, dict) and c.get("name"):
+                carriers.add(c["name"])
+            for cov in p.get("coverages", []) or []:
+                if isinstance(cov, dict):
+                    ct = cov.get("type") or cov.get("product_name")
+                    if ct:
+                        coverage_types_set.add(ct)
+
+        with fc1:
+            carrier_options = [""] + sorted(carriers)
+            selected_carrier = st.selectbox(
+                "חברת ביטוח",
+                options=carrier_options,
+                format_func=lambda x: "כל החברות" if x == "" else x,
+                key="search_carrier",
+            )
+        with fc2:
+            cov_options = [""] + sorted(coverage_types_set)
+            selected_cov_type = st.selectbox(
+                "סוג כיסוי",
+                options=cov_options,
+                format_func=lambda x: "כל סוגי הכיסוי" if x == "" else x,
+                key="search_cov_type",
+            )
+        with fc3:
+            date_from = st.date_input("מתאריך", value=None, key="search_date_from")
+        with fc4:
+            date_to = st.date_input("עד תאריך", value=None, key="search_date_to")
+
+        if st.button("חפש", type="primary", use_container_width=True, key="search_btn"):
+            with st.spinner("מחפש..."):
+                try:
+                    search_payload = {
+                        "query": search_query,
+                        "policies": st.session_state.extracted_policies,
+                        "carrier": selected_carrier,
+                        "coverage_type": selected_cov_type,
+                        "date_from": str(date_from) if date_from else "",
+                        "date_to": str(date_to) if date_to else "",
+                    }
+                    resp = requests.post(
+                        f"{backend_url}/search",
+                        json=search_payload,
+                        timeout=30,
+                    )
+                    if resp.status_code == 200:
+                        st.session_state.search_results = resp.json()
+                    else:
+                        st.error(f"שגיאה: {resp.status_code} - {resp.text}")
+                except Exception as e:
+                    st.error(f"שגיאת חיבור: {str(e)}")
+
+        # Display search results
+        results_data = st.session_state.search_results
+        if results_data is not None:
+            results = results_data.get("results", [])
+            total = results_data.get("total", 0)
+
+            if total == 0:
+                st.markdown(
+                    '<div class="search-no-results">'
+                    '<p style="font-size:1.3rem;">לא נמצאו תוצאות</p>'
+                    '<p>נסה לשנות את מילות החיפוש או הסינון.</p>'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.success(f"נמצאו {total} תוצאות")
+
+                for r in results:
+                    holder_display = r.get("policyholder", "")
+                    if holder_display and not st.session_state.show_sensitive:
+                        holder_display = mask_name(holder_display)
+
+                    tags_html = "".join(
+                        f'<span class="result-tag">{ct}</span>' for ct in r.get("coverage_types", [])
+                    )
+                    premium = r.get("total_monthly_premium") or 0
+
+                    st.markdown(
+                        f'<div class="search-results-card">'
+                        f'<div class="result-header">'
+                        f'<span class="result-policy-num">פוליסה: {r.get("policy_number", "N/A")}</span>'
+                        f'<span class="result-carrier">{r.get("carrier", "")}</span>'
+                        f'</div>'
+                        f'<div class="result-details">'
+                        f'<span>מבוטח: {holder_display}</span>'
+                        f'<span>פרמיה: ₪{premium:,.2f}</span>'
+                        f'</div>'
+                        f'<div style="margin-top:8px;">{tags_html}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
+# ==================== TAB 7: Chat ====================
+with tab7:
+    st.markdown(
+        '<div class="section-header"><h2>שאל שאלה על הפוליסות</h2>'
+        '<p>שאל שאלות בעברית או באנגלית על הפוליסות שהועלו.</p></div>',
+        unsafe_allow_html=True,
+    )
+
+    if not st.session_state.extracted_policies:
+        st.warning("לא נמצאו פוליסות. העלה קבצים בלשונית הראשונה כדי להתחיל שיחה.")
+    else:
+        # Chat header
+        st.markdown(
+            '<div class="chat-header">שאל שאלה על הפוליסות שלך</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Display chat messages
+        if not st.session_state.chat_messages:
+            st.markdown(
+                '<div class="chat-empty">'
+                '<p style="font-size:1.1rem;margin-bottom:8px;">שלום! אני עוזר ביטוח חכם.</p>'
+                '<p>שאל אותי על הכיסויים, הפרמיות או כל פרט בפוליסות שלך.</p>'
+                '<div class="chat-suggestions">'
+                '<span class="chat-suggestion">מה הכיסוי שלי?</span>'
+                '<span class="chat-suggestion">כמה אני משלם בחודש?</span>'
+                '<span class="chat-suggestion">Compare my policies</span>'
+                '<span class="chat-suggestion">יש לי החרגות?</span>'
+                '</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            # Show message history
+            for msg in st.session_state.chat_messages:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if role == "user":
+                    st.markdown(
+                        f'<div class="chat-msg user">{content}</div>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown(
+                        f'<div class="chat-msg assistant">{content}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+        # Chat input
+        chat_col1, chat_col2 = st.columns([5, 1])
+        with chat_col1:
+            chat_input = st.text_input(
+                "הודעה",
+                placeholder="הקלד שאלה...",
+                key="chat_input_field",
+                label_visibility="collapsed",
+            )
+        with chat_col2:
+            send_pressed = st.button("שלח", type="primary", key="chat_send_btn", use_container_width=True)
+
+        if send_pressed and chat_input:
+            # Add user message
+            st.session_state.chat_messages.append({"role": "user", "content": chat_input})
+
+            with st.spinner("חושב..."):
+                try:
+                    chat_payload = {
+                        "message": chat_input,
+                        "history": st.session_state.chat_messages[:-1],  # Exclude current message (sent in 'message')
+                        "policies": st.session_state.extracted_policies,
+                    }
+                    resp = requests.post(
+                        f"{backend_url}/chat",
+                        json=chat_payload,
+                        timeout=60,
+                    )
+                    if resp.status_code == 200:
+                        result = resp.json()
+                        assistant_msg = result.get("response", "")
+                        st.session_state.chat_messages.append(
+                            {"role": "assistant", "content": assistant_msg}
+                        )
+                    else:
+                        error_text = f"שגיאה ({resp.status_code}): לא הצלחתי לעבד את השאלה."
+                        st.session_state.chat_messages.append(
+                            {"role": "assistant", "content": error_text}
+                        )
+                except Exception as e:
+                    error_text = f"שגיאת חיבור: {str(e)}"
+                    st.session_state.chat_messages.append(
+                        {"role": "assistant", "content": error_text}
+                    )
+
+            st.rerun()
+
+        # Clear chat button
+        if st.session_state.chat_messages:
+            if st.button("נקה שיחה", key="chat_clear_btn"):
+                st.session_state.chat_messages = []
+                st.rerun()
 
 # Footer
 st.markdown("---")
