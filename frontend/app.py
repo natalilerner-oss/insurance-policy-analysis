@@ -1298,6 +1298,10 @@ st.markdown("""
             Stop searching, start knowing
         </span>
     </div>
+    <div style="margin-top:6px;color:#6b7280;font-size:0.85rem;">
+        Powered by <a href="https://documentinsight.ai" style="color:#0056b3;font-weight:600;text-decoration:none;">DocumentInsight.ai</a>
+        &nbsp;|&nbsp; Created by <strong>Natali Koifman</strong>
+    </div>
     <div style="margin-top:8px;color:#9ca3af;font-size:0.8rem;">
         &copy; 2024 DocumentInsight.ai — כל הזכויות שמורות
     </div>
