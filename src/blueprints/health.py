@@ -42,7 +42,9 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
             "file_translation",
             "insurance_portfolio_excel_generation",
             "policy_comparison",
-            "recent_sessions"
+            "recent_sessions",
+            "policy_chat",
+            "policy_search"
         ],
         "memory": get_memory_info(),
         "request_id": get_request_id(),
