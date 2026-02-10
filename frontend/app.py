@@ -12,9 +12,21 @@ import pandas as pd
 
 # Ensure sibling modules are importable regardless of cwd
 sys.path.insert(0, str(Path(__file__).parent))
+# Also make sure the project root is on the path for src imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from sanitizer import (
     mask_id_number, mask_name, mask_address, mask_phone, mask_email,
     sanitize_policy, sanitize_policies,
+)
+from src.document_helpers import (
+    detect_document_type,
+    get_party_name,
+    get_issuer_name,
+    get_document_number,
+    get_total_amount,
+    get_document_date,
+    get_document_type_label,
+    is_policy,
 )
 
 load_dotenv()
@@ -27,7 +39,7 @@ POLL_BACKOFF_INCREMENT_SECONDS = 2  # Interval increase per poll
 
 # Configuration
 st.set_page_config(
-    page_title="PolicyLens - מחלץ פוליסות ביטוח",
+    page_title="PolicyLens - ניהול מסמכים פיננסיים",
     page_icon="🔍",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -783,7 +795,7 @@ st.markdown("""
 <div class="hero-section">
     <h1>PolicyLens</h1>
     <div class="hero-subtitle">
-        מערכת חכמה לחילוץ וניהול פוליסות ביטוח — מונעת בינה מלאכותית
+        מערכת חכמה לחילוץ וניהול מסמכים פיננסיים — פוליסות, חשבוניות, קבלות ועוד — מונעת בינה מלאכותית
     </div>
     <div class="hero-features">
         <div class="hero-feature-item">
@@ -827,10 +839,10 @@ st.markdown("""
 st.markdown('<div style="text-align:center; margin-bottom:8px;"><span class="pill-badge">מוכן לעבודה עם AI</span></div>', unsafe_allow_html=True)
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "1. העלאת פוליסות",
+    "1. העלאת מסמכים",
     "2. סקירת נתונים",
     "3. יצירת תיק ביטוח",
-    "4. השוואת פוליסות",
+    "4. השוואת מסמכים",
     "5. חילוצים אחרונים",
     "6. חיפוש",
     "7. צ'אט"
@@ -838,7 +850,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 
 # ==================== TAB 1: Upload Policies ====================
 with tab1:
-    st.markdown('<div class="section-header"><h2>העלאת מסמכי פוליסה</h2><p>העלה קבצי PDF או תמונות של פוליסות ביטוח. המערכת תחליץ את הנתונים באופן אוטומטי.</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header"><h2>העלאת מסמכים</h2><p>העלה קבצי PDF או תמונות של מסמכים פיננסיים (פוליסות, חשבוניות, קבלות, הצעות מחיר ועוד). המערכת תזהה את סוג המסמך ותחליץ את הנתונים באופן אוטומטי.</p></div>', unsafe_allow_html=True)
     
     # Family name input
     family_name = st.text_input(
@@ -853,10 +865,10 @@ with tab1:
     
     # File uploader - multiple files
     uploaded_files = st.file_uploader(
-        "בחר קבצי פוליסה",
+        "בחר מסמכים",
         type=['pdf', 'png', 'jpg', 'jpeg'],
         accept_multiple_files=True,
-        help="ניתן להעלות מספר קבצים בו-זמנית"
+        help="ניתן להעלות מספר קבצים בו-זמנית — פוליסות, חשבוניות, קבלות ועוד"
     )
     
     if uploaded_files:
@@ -875,7 +887,7 @@ with tab1:
         st.divider()
         
         # Extract button
-        if st.button("🚀 חלץ נתונים מכל הפוליסות", type="primary", use_container_width=True):
+        if st.button("🚀 חלץ נתונים מכל המסמכים", type="primary", use_container_width=True):
             progress_bar = st.progress(0)
             status_text = st.empty()
             
@@ -977,7 +989,7 @@ with tab1:
             
             if extracted_policies:
                 st.balloons()
-                st.success(f"🎉 חולצו בהצלחה {len(extracted_policies)} פוליסות!")
+                st.success(f"🎉 חולצו בהצלחה {len(extracted_policies)} מסמכים!")
                 st.info("👈 עבור ללשונית 'סקירת נתונים' לצפייה בתוצאות")
 
                 # Save session to backend
@@ -997,84 +1009,203 @@ with tab1:
 # ==================== TAB 2: Review Data ====================
 with tab2:
     st.markdown('<div class="section-header"><h2>סקירת נתונים שחולצו</h2></div>', unsafe_allow_html=True)
-    
+
     if not st.session_state.extracted_policies:
-        st.warning("⚠️ לא נמצאו פוליסות. העלה קבצים בלשונית הראשונה.")
+        st.warning("⚠️ לא נמצאו מסמכים. העלה קבצים בלשונית הראשונה.")
     else:
         # Summary cards
-        total_premium = 0
-        all_members = set()
+        total_amount = 0
+        all_parties = set()
+        doc_type_counts = {}
 
-        for policy in st.session_state.extracted_policies:
-            if 'total_monthly_premium' in policy:
-                total_premium += policy.get('total_monthly_premium') or 0
-            if 'policyholder' in policy and 'name' in policy['policyholder']:
-                raw_name = policy['policyholder']['name']
-                all_members.add(mask_name(raw_name) if not st.session_state.show_sensitive else raw_name)
+        for doc in st.session_state.extracted_policies:
+            doc_type = doc.get('document_type', detect_document_type(doc))
+            doc_type_counts[doc_type] = doc_type_counts.get(doc_type, 0) + 1
+            total_amount += get_total_amount(doc)
+            raw_name = get_party_name(doc)
+            if raw_name and raw_name != "Unknown":
+                all_parties.add(mask_name(raw_name) if not st.session_state.show_sensitive else raw_name)
+
+        # Document type filter
+        all_types = [""] + sorted(doc_type_counts.keys())
+        selected_doc_type = st.selectbox(
+            "סוג מסמך",
+            options=all_types,
+            format_func=lambda x: "כל המסמכים" if x == "" else get_document_type_label(x),
+            key="review_doc_type_filter",
+        )
 
         # Summary row
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("פוליסות", len(st.session_state.extracted_policies))
+            st.metric("מסמכים", len(st.session_state.extracted_policies))
         with col2:
-            st.metric("מבוטחים", len(all_members))
+            policy_count = doc_type_counts.get("policy", 0)
+            st.metric("פוליסות", policy_count)
         with col3:
-            st.metric("סה״כ פרמיה חודשית", f"₪{total_premium:,.2f}")
-        
+            st.metric("צדדים/מבוטחים", len(all_parties))
+        with col4:
+            st.metric("סה״כ סכום", f"₪{total_amount:,.2f}")
+
         st.divider()
-        
-        # Display each policy
-        for i, policy in enumerate(st.session_state.extracted_policies):
+
+        # Display each document
+        for i, doc in enumerate(st.session_state.extracted_policies):
+            doc_type = doc.get('document_type', detect_document_type(doc))
+
+            # Apply filter
+            if selected_doc_type and doc_type != selected_doc_type:
+                continue
+
             # Prepare display copy with PII masked when toggle is off
-            display = policy if st.session_state.show_sensitive else sanitize_policy(policy)
+            display = doc if st.session_state.show_sensitive else sanitize_policy(doc)
+
+            type_label = get_document_type_label(doc_type)
+            doc_num = get_document_number(doc)
+            source_file = doc.get('_source_file', 'Unknown')
 
             with st.expander(
-                f"📄 פוליסה {i+1}: {policy.get('_source_file', 'Unknown')}",
+                f"{type_label} {i+1}: {source_file} (#{doc_num})",
                 expanded=(i == 0)
             ):
-                # Policy header
-                col1, col2 = st.columns(2)
+                if doc_type == "policy":
+                    # ----- Policy-specific display -----
+                    col1, col2 = st.columns(2)
 
-                with col1:
-                    if 'policyholder' in display:
-                        ph = display['policyholder']
-                        st.markdown(f"**מבוטח:** {ph.get('name', 'N/A')}")
-                        if st.session_state.show_sensitive:
-                            st.markdown(f"**ת.ז.:** {ph.get('id_number', 'N/A')}")
-                        else:
-                            st.markdown(f"**ת.ז.:** {ph.get('id_number', 'N/A')} 🔒")
-                        st.markdown(f"**תאריך לידה:** {ph.get('date_of_birth', 'N/A')}")
+                    with col1:
+                        ph = display.get('policyholder')
+                        if isinstance(ph, dict):
+                            st.markdown(f"**מבוטח:** {ph.get('name', 'N/A')}")
+                            if st.session_state.show_sensitive:
+                                st.markdown(f"**ת.ז.:** {ph.get('id_number', 'N/A')}")
+                            else:
+                                st.markdown(f"**ת.ז.:** {ph.get('id_number', 'N/A')} 🔒")
+                            st.markdown(f"**תאריך לידה:** {ph.get('date_of_birth', 'N/A')}")
 
-                with col2:
-                    if 'carrier' in display:
-                        carrier = display['carrier']
-                        st.markdown(f"**חברת ביטוח:** {carrier.get('name', 'N/A')}")
-                    st.markdown(f"**מספר פוליסה:** {display.get('policy_number', 'N/A')}")
-                    st.markdown(f"**פרמיה חודשית:** ₪{(display.get('total_monthly_premium') or 0):,.2f}")
+                    with col2:
+                        carrier = display.get('carrier')
+                        if isinstance(carrier, dict):
+                            st.markdown(f"**חברת ביטוח:** {carrier.get('name', 'N/A')}")
+                        st.markdown(f"**מספר פוליסה:** {display.get('policy_number', 'N/A')}")
+                        st.markdown(f"**פרמיה חודשית:** ₪{(display.get('total_monthly_premium') or 0):,.2f}")
 
-                # Coverages
-                if 'coverages' in display and display['coverages']:
+                    # Coverages
+                    if display.get('coverages'):
+                        st.markdown("---")
+                        st.markdown("**כיסויים:**")
+
+                        coverage_data = []
+                        for cov in display['coverages']:
+                            if not isinstance(cov, dict):
+                                continue
+                            coverage_data.append({
+                                "סוג כיסוי": cov.get('type', ''),
+                                "שם מוצר": cov.get('product_name', ''),
+                                "פרמיה": f"₪{(cov.get('premium', {}).get('final_monthly') or 0):,.2f}" if isinstance(cov.get('premium'), dict) else f"₪{(cov.get('premium') or 0):,.2f}"
+                            })
+
+                        if coverage_data:
+                            st.dataframe(coverage_data, use_container_width=True, hide_index=True)
+
+                    # Exclusions
+                    if display.get('exclusions'):
+                        st.markdown("---")
+                        st.markdown("**החרגות:**")
+                        for exc in display['exclusions']:
+                            if isinstance(exc, dict):
+                                st.markdown(f"- {exc.get('coverage', '')}: {', '.join(exc.get('conditions', []))}")
+
+                elif doc_type in ("invoice", "quote", "purchase_order", "tax_document"):
+                    # ----- Invoice / Quote / PO / Tax document display -----
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        from_party = display.get('from_party')
+                        if isinstance(from_party, dict):
+                            st.markdown(f"**ספק/מנפיק:** {from_party.get('name', 'N/A')}")
+                            if from_party.get('address'):
+                                st.markdown(f"**כתובת:** {from_party['address']}")
+                            if from_party.get('phone'):
+                                st.markdown(f"**טלפון:** {from_party['phone']}")
+
+                    with col2:
+                        to_party = display.get('to_party')
+                        if isinstance(to_party, dict):
+                            st.markdown(f"**לקוח:** {to_party.get('name', 'N/A')}")
+                            if to_party.get('address'):
+                                st.markdown(f"**כתובת:** {to_party['address']}")
+                        st.markdown(f"**מספר מסמך:** {display.get('document_number', 'N/A')}")
+                        st.markdown(f"**תאריך:** {display.get('document_date', 'N/A')}")
+
+                    # Line items table
+                    line_items = display.get('line_items', [])
+                    if line_items:
+                        st.markdown("---")
+                        st.markdown("**פריטים:**")
+                        items_data = []
+                        for item in line_items:
+                            if not isinstance(item, dict):
+                                continue
+                            items_data.append({
+                                "#": item.get('item_number', ''),
+                                "קוד": item.get('code', ''),
+                                "תיאור": item.get('description', ''),
+                                "כמות": item.get('quantity', ''),
+                                "מחיר יחידה": f"₪{item.get('unit_price', 0):,.2f}" if item.get('unit_price') else '',
+                                "סה״כ": f"₪{item.get('total', 0):,.2f}" if item.get('total') else '',
+                            })
+                        if items_data:
+                            st.dataframe(items_data, use_container_width=True, hide_index=True)
+
+                    # Totals
                     st.markdown("---")
-                    st.markdown("**כיסויים:**")
+                    totals_col1, totals_col2 = st.columns(2)
+                    with totals_col1:
+                        if display.get('subtotal') is not None:
+                            st.markdown(f"**סכום ביניים:** ₪{display['subtotal']:,.2f}")
+                        if display.get('discount') is not None:
+                            st.markdown(f"**הנחה:** ₪{display['discount']:,.2f}")
+                        if display.get('tax') is not None:
+                            st.markdown(f"**מע״מ:** ₪{display['tax']:,.2f}")
+                    with totals_col2:
+                        if display.get('total') is not None:
+                            st.markdown(f"### סה״כ לתשלום: ₪{display['total']:,.2f}")
+                        if display.get('po_number'):
+                            st.markdown(f"**מס׳ הזמנה:** {display['po_number']}")
+                        if display.get('delivery_date'):
+                            st.markdown(f"**תאריך אספקה:** {display['delivery_date']}")
+                        if display.get('payment_terms'):
+                            st.markdown(f"**תנאי תשלום:** {display['payment_terms']}")
 
-                    coverage_data = []
-                    for cov in display['coverages']:
-                        coverage_data.append({
-                            "סוג כיסוי": cov.get('type', ''),
-                            "שם מוצר": cov.get('product_name', ''),
-                            "פרמיה": f"₪{(cov.get('premium', {}).get('final_monthly') or 0):,.2f}" if isinstance(cov.get('premium'), dict) else f"₪{(cov.get('premium') or 0):,.2f}"
-                        })
+                elif doc_type == "receipt":
+                    # ----- Receipt display -----
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        from_party = display.get('from_party')
+                        if isinstance(from_party, dict):
+                            st.markdown(f"**מנפיק:** {from_party.get('name', 'N/A')}")
+                        to_party = display.get('to_party')
+                        if isinstance(to_party, dict):
+                            st.markdown(f"**משלם:** {to_party.get('name', 'N/A')}")
+                    with col2:
+                        st.markdown(f"**מספר קבלה:** {display.get('document_number', 'N/A')}")
+                        st.markdown(f"**תאריך:** {display.get('document_date', 'N/A')}")
+                        if display.get('payment_method'):
+                            st.markdown(f"**אמצעי תשלום:** {display['payment_method']}")
+                        if display.get('total') is not None:
+                            st.markdown(f"### סכום: ₪{display['total']:,.2f}")
 
-                    st.dataframe(coverage_data, use_container_width=True, hide_index=True)
+                else:
+                    # ----- Generic document display -----
+                    st.markdown(f"**סוג מסמך:** {type_label}")
+                    st.markdown(f"**מספר:** {get_document_number(display)}")
+                    if display.get('document_date'):
+                        st.markdown(f"**תאריך:** {display['document_date']}")
+                    total = get_total_amount(display)
+                    if total:
+                        st.markdown(f"**סכום:** ₪{total:,.2f}")
 
-                # Exclusions
-                if 'exclusions' in display and display['exclusions']:
-                    st.markdown("---")
-                    st.markdown("**החרגות:**")
-                    for exc in display['exclusions']:
-                        st.markdown(f"- {exc.get('coverage', '')}: {', '.join(exc.get('conditions', []))}")
-
-                # Sanitized JSON viewer (read-only)
+                # Raw JSON viewer (read-only)
                 with st.expander("📝 JSON גולמי"):
                     st.json(display)
 
@@ -1085,53 +1216,87 @@ with tab2:
         if not st.session_state.show_sensitive:
             st.info("להצגת ועריכת הנתונים המלאים, הפעל את מתג 'הצג מידע רגיש' בסרגל הצד.")
 
-        for i, policy in enumerate(st.session_state.extracted_policies):
-            with st.expander(f"עריכת פוליסה {i+1}: {policy.get('_source_file', '')}"):
-                # Determine display values based on sensitive toggle
-                raw_name = policy.get('policyholder', {}).get('name', '')
-                display_name = raw_name if st.session_state.show_sensitive else mask_name(raw_name)
-                raw_carrier = policy.get('carrier', {}).get('name', '')
+        for i, doc in enumerate(st.session_state.extracted_policies):
+            doc_type = doc.get('document_type', detect_document_type(doc))
+            type_label = get_document_type_label(doc_type)
+            source_file = doc.get('_source_file', '')
 
-                ec1, ec2 = st.columns(2)
-                with ec1:
-                    new_name = st.text_input(
-                        "שם מבוטח",
-                        value=display_name,
-                        key=f"edit_name_{i}",
-                        disabled=not st.session_state.show_sensitive,
-                    )
-                    new_pnum = st.text_input(
-                        "מספר פוליסה",
-                        value=policy.get('policy_number', ''),
-                        key=f"edit_pnum_{i}",
-                    )
-                with ec2:
-                    new_carrier = st.text_input(
-                        "חברת ביטוח",
-                        value=raw_carrier,
-                        key=f"edit_carrier_{i}",
-                    )
-                    new_premium = st.number_input(
-                        "פרמיה חודשית",
-                        value=float(policy.get('total_monthly_premium') or 0),
-                        key=f"edit_prem_{i}",
-                        format="%.2f",
-                        min_value=0.0,
-                    )
+            with st.expander(f"עריכת {type_label} {i+1}: {source_file}"):
+                if doc_type == "policy":
+                    # Policy editing (existing logic, safe)
+                    raw_name = doc.get('policyholder', {}).get('name', '') if isinstance(doc.get('policyholder'), dict) else ''
+                    display_name = raw_name if st.session_state.show_sensitive else mask_name(raw_name)
+                    raw_carrier = doc.get('carrier', {}).get('name', '') if isinstance(doc.get('carrier'), dict) else ''
 
-                if st.button("שמור שינויים", key=f"save_policy_{i}"):
-                    if 'policyholder' not in policy:
-                        policy['policyholder'] = {}
-                    # Only update name if sensitive is on (field was editable)
-                    if st.session_state.show_sensitive:
-                        policy['policyholder']['name'] = new_name
-                    policy['policy_number'] = new_pnum
-                    if 'carrier' not in policy:
-                        policy['carrier'] = {}
-                    policy['carrier']['name'] = new_carrier
-                    policy['total_monthly_premium'] = new_premium
-                    st.success("השינויים נשמרו!")
-                    st.rerun()
+                    ec1, ec2 = st.columns(2)
+                    with ec1:
+                        new_name = st.text_input(
+                            "שם מבוטח",
+                            value=display_name,
+                            key=f"edit_name_{i}",
+                            disabled=not st.session_state.show_sensitive,
+                        )
+                        new_pnum = st.text_input(
+                            "מספר פוליסה",
+                            value=doc.get('policy_number', ''),
+                            key=f"edit_pnum_{i}",
+                        )
+                    with ec2:
+                        new_carrier = st.text_input(
+                            "חברת ביטוח",
+                            value=raw_carrier,
+                            key=f"edit_carrier_{i}",
+                        )
+                        new_premium = st.number_input(
+                            "פרמיה חודשית",
+                            value=float(doc.get('total_monthly_premium') or 0),
+                            key=f"edit_prem_{i}",
+                            format="%.2f",
+                            min_value=0.0,
+                        )
+
+                    if st.button("שמור שינויים", key=f"save_policy_{i}"):
+                        if not isinstance(doc.get('policyholder'), dict):
+                            doc['policyholder'] = {}
+                        if st.session_state.show_sensitive:
+                            doc['policyholder']['name'] = new_name
+                        doc['policy_number'] = new_pnum
+                        if not isinstance(doc.get('carrier'), dict):
+                            doc['carrier'] = {}
+                        doc['carrier']['name'] = new_carrier
+                        doc['total_monthly_premium'] = new_premium
+                        st.success("השינויים נשמרו!")
+                        st.rerun()
+
+                else:
+                    # Generic document editing
+                    ec1, ec2 = st.columns(2)
+                    with ec1:
+                        new_doc_num = st.text_input(
+                            "מספר מסמך",
+                            value=doc.get('document_number', ''),
+                            key=f"edit_docnum_{i}",
+                        )
+                        new_doc_date = st.text_input(
+                            "תאריך מסמך",
+                            value=doc.get('document_date', ''),
+                            key=f"edit_docdate_{i}",
+                        )
+                    with ec2:
+                        new_total = st.number_input(
+                            "סה״כ",
+                            value=float(doc.get('total') or 0),
+                            key=f"edit_total_{i}",
+                            format="%.2f",
+                            min_value=0.0,
+                        )
+
+                    if st.button("שמור שינויים", key=f"save_doc_{i}"):
+                        doc['document_number'] = new_doc_num
+                        doc['document_date'] = new_doc_date
+                        doc['total'] = new_total
+                        st.success("השינויים נשמרו!")
+                        st.rerun()
 
 # ==================== TAB 3: Generate Portfolio ====================
 with tab3:
@@ -1168,47 +1333,61 @@ with tab3:
         # Preview what will be included
         st.markdown("### 📋 פוליסות שייכללו בתיק:")
         
-        # Convert extracted policies to portfolio format
+        # Convert extracted policies to portfolio format (only policies)
         family_members = []
         insurance_products = []
-        
-        for policy in st.session_state.extracted_policies:
-            # Extract member
-            if 'policyholder' in policy:
-                member_name = policy['policyholder'].get('name', 'לא ידוע')
+
+        # Filter to policy documents only for portfolio generation
+        policy_docs = [
+            p for p in st.session_state.extracted_policies
+            if p.get('document_type', detect_document_type(p)) == 'policy'
+        ]
+
+        non_policy_count = len(st.session_state.extracted_policies) - len(policy_docs)
+        if non_policy_count > 0:
+            st.info(f"📋 {non_policy_count} מסמכים שאינם פוליסות (חשבוניות, קבלות וכו') לא ייכללו בתיק הביטוח.")
+
+        for policy in policy_docs:
+            # Extract member (safe access)
+            ph = policy.get('policyholder')
+            if isinstance(ph, dict):
+                member_name = ph.get('name', 'לא ידוע')
                 if member_name not in [m['name'] for m in family_members]:
                     family_members.append({
                         "name": member_name,
                         "role": "מבוטח"
                     })
-            
+
             # Extract products
             if 'coverages' in policy:
                 for cov in policy['coverages']:
+                    if not isinstance(cov, dict):
+                        continue
+                    period = cov.get('period')
                     product = {
-                        "member_name": policy.get('policyholder', {}).get('name', 'לא ידוע'),
+                        "member_name": ph.get('name', 'לא ידוע') if isinstance(ph, dict) else 'לא ידוע',
                         "policy_number": policy.get('policy_number', ''),
-                        "start_date": cov.get('period', {}).get('start', str(date.today())),
-                        "company": policy.get('carrier', {}).get('name', ''),
+                        "start_date": period.get('start', str(date.today())) if isinstance(period, dict) else str(date.today()),
+                        "company": policy.get('carrier', {}).get('name', '') if isinstance(policy.get('carrier'), dict) else '',
                         "product_name": cov.get('type', ''),
                         "details": cov.get('product_name', ''),
                         "premium": (cov.get('premium', {}).get('final_monthly') or 0) if isinstance(cov.get('premium'), dict) else (cov.get('premium') or 0),
                         "exclusions": '',
                         "discounts": ''
                     }
-                    
+
                     # Check for exclusions
-                    if 'exclusions' in policy:
-                        for exc in policy['exclusions']:
+                    for exc in policy.get('exclusions', []) or []:
+                        if isinstance(exc, dict):
                             if exc.get('coverage') == cov.get('type') or exc.get('appendix') == cov.get('appendix_number'):
                                 product['exclusions'] = ', '.join(exc.get('conditions', []))
-                    
+
                     # Check for discounts
                     if isinstance(cov.get('premium'), dict):
                         discount = cov['premium'].get('discount_percent') or 0
                         if discount and discount > 0:
                             product['discounts'] = f"{discount}%"
-                    
+
                     insurance_products.append(product)
         
         # Show preview table
@@ -1322,19 +1501,26 @@ with tab3:
 
             st.json(display_payload)
 
-# ==================== TAB 4: Compare Policies ====================
+# ==================== TAB 4: Compare Documents ====================
 with tab4:
-    st.markdown('<div class="section-header"><h2>השוואת פוליסות</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header"><h2>השוואת מסמכים</h2></div>', unsafe_allow_html=True)
 
     if not st.session_state.extracted_policies:
-        st.warning("⚠️ לא נמצאו פוליסות. העלה קבצים בלשונית הראשונה.")
+        st.warning("⚠️ לא נמצאו מסמכים. העלה קבצים בלשונית הראשונה.")
     else:
+        # Filter to policies only for comparison
+        policy_docs_for_compare = [
+            p for p in st.session_state.extracted_policies
+            if p.get('document_type', detect_document_type(p)) == 'policy'
+        ]
+        if not policy_docs_for_compare:
+            st.info("📋 השוואת פוליסות זמינה רק עבור מסמכי פוליסה. לא נמצאו פוליסות.")
         st.markdown("בחר להשוות את הכיסויים והפרמיות בין הפוליסות שחולצו.")
 
         if st.button("השווה פוליסות", type="primary", use_container_width=True):
             with st.spinner("מבצע השוואה..."):
                 try:
-                    compare_data = st.session_state.extracted_policies
+                    compare_data = policy_docs_for_compare
                     response = requests.post(
                         f"{backend_url}/compare_policies",
                         json={"policies": compare_data},
@@ -1368,7 +1554,7 @@ with tab4:
 
 # ==================== TAB 5: Recent Sessions ====================
 with tab5:
-    st.markdown('<div class="section-header"><h2>חילוצים אחרונים</h2><p>צפייה בפוליסות שחולצו בעבר וטעינתן מחדש לעבודה.</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header"><h2>חילוצים אחרונים</h2><p>צפייה במסמכים שחולצו בעבר וטעינתם מחדש לעבודה.</p></div>', unsafe_allow_html=True)
 
     if st.button("רענן רשימה", key="refresh_sessions"):
         pass  # button press triggers a rerun which fetches fresh data
@@ -1422,10 +1608,10 @@ with tab5:
 
 # ==================== TAB 6: Search ====================
 with tab6:
-    st.markdown('<div class="section-header"><h2>חיפוש בפוליסות</h2><p>חפש לפי מספר פוליסה, חברת ביטוח, סוג כיסוי או טקסט חופשי.</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header"><h2>חיפוש במסמכים</h2><p>חפש לפי מספר מסמך, חברה, סוג כיסוי או טקסט חופשי.</p></div>', unsafe_allow_html=True)
 
     if not st.session_state.extracted_policies:
-        st.warning("לא נמצאו פוליסות. העלה קבצים בלשונית הראשונה.")
+        st.warning("לא נמצאו מסמכים. העלה קבצים בלשונית הראשונה.")
     else:
         # Search input
         search_query = st.text_input(
@@ -1436,15 +1622,22 @@ with tab6:
         )
 
         # Filters row
-        fc1, fc2, fc3, fc4 = st.columns(4)
+        fc1, fc2, fc3, fc4, fc5 = st.columns(5)
 
-        # Gather unique carriers for dropdown
+        # Gather unique carriers and document types for dropdowns
         carriers = set()
         coverage_types_set = set()
+        search_doc_types = set()
         for p in st.session_state.extracted_policies:
+            dt = p.get("document_type", detect_document_type(p))
+            search_doc_types.add(dt)
             c = p.get("carrier", {})
             if isinstance(c, dict) and c.get("name"):
                 carriers.add(c["name"])
+            # Also consider from_party name as a "carrier/supplier"
+            fp = p.get("from_party", {})
+            if isinstance(fp, dict) and fp.get("name"):
+                carriers.add(fp["name"])
             for cov in p.get("coverages", []) or []:
                 if isinstance(cov, dict):
                     ct = cov.get("type") or cov.get("product_name")
@@ -1452,14 +1645,22 @@ with tab6:
                         coverage_types_set.add(ct)
 
         with fc1:
+            search_dtype_options = [""] + sorted(search_doc_types)
+            selected_search_dtype = st.selectbox(
+                "סוג מסמך",
+                options=search_dtype_options,
+                format_func=lambda x: "כל המסמכים" if x == "" else get_document_type_label(x),
+                key="search_doc_type",
+            )
+        with fc2:
             carrier_options = [""] + sorted(carriers)
             selected_carrier = st.selectbox(
-                "חברת ביטוח",
+                "חברה/ספק",
                 options=carrier_options,
                 format_func=lambda x: "כל החברות" if x == "" else x,
                 key="search_carrier",
             )
-        with fc2:
+        with fc3:
             cov_options = [""] + sorted(coverage_types_set)
             selected_cov_type = st.selectbox(
                 "סוג כיסוי",
@@ -1467,9 +1668,9 @@ with tab6:
                 format_func=lambda x: "כל סוגי הכיסוי" if x == "" else x,
                 key="search_cov_type",
             )
-        with fc3:
-            date_from = st.date_input("מתאריך", value=None, key="search_date_from")
         with fc4:
+            date_from = st.date_input("מתאריך", value=None, key="search_date_from")
+        with fc5:
             date_to = st.date_input("עד תאריך", value=None, key="search_date_to")
 
         if st.button("חפש", type="primary", use_container_width=True, key="search_btn"):
@@ -1478,6 +1679,7 @@ with tab6:
                     search_payload = {
                         "query": search_query,
                         "policies": st.session_state.extracted_policies,
+                        "document_type": selected_search_dtype,
                         "carrier": selected_carrier,
                         "coverage_type": selected_cov_type,
                         "date_from": str(date_from) if date_from else "",
@@ -1513,24 +1715,28 @@ with tab6:
                 st.success(f"נמצאו {total} תוצאות")
 
                 for r in results:
-                    holder_display = r.get("policyholder", "")
+                    holder_display = r.get("party_name") or r.get("policyholder", "")
                     if holder_display and not st.session_state.show_sensitive:
                         holder_display = mask_name(holder_display)
 
                     tags_html = "".join(
                         f'<span class="result-tag">{ct}</span>' for ct in r.get("coverage_types", [])
                     )
-                    premium = r.get("total_monthly_premium") or 0
+                    amount = r.get("total_amount") or r.get("total_monthly_premium") or 0
+                    r_doc_type = r.get("document_type", "policy")
+                    r_type_label = get_document_type_label(r_doc_type)
+                    doc_num = r.get("document_number") or r.get("policy_number") or "N/A"
+                    issuer = r.get("issuer") or r.get("carrier", "")
 
                     st.markdown(
                         f'<div class="search-results-card">'
                         f'<div class="result-header">'
-                        f'<span class="result-policy-num">פוליסה: {r.get("policy_number", "N/A")}</span>'
-                        f'<span class="result-carrier">{r.get("carrier", "")}</span>'
+                        f'<span class="result-policy-num">{r_type_label}: {doc_num}</span>'
+                        f'<span class="result-carrier">{issuer}</span>'
                         f'</div>'
                         f'<div class="result-details">'
-                        f'<span>מבוטח: {holder_display}</span>'
-                        f'<span>פרמיה: ₪{premium:,.2f}</span>'
+                        f'<span>{holder_display}</span>'
+                        f'<span>סכום: ₪{amount:,.2f}</span>'
                         f'</div>'
                         f'<div style="margin-top:8px;">{tags_html}</div>'
                         f'</div>',
@@ -1540,17 +1746,17 @@ with tab6:
 # ==================== TAB 7: Chat ====================
 with tab7:
     st.markdown(
-        '<div class="section-header"><h2>שאל שאלה על הפוליסות</h2>'
-        '<p>שאל שאלות בעברית או באנגלית על הפוליסות שהועלו.</p></div>',
+        '<div class="section-header"><h2>שאל שאלה על המסמכים</h2>'
+        '<p>שאל שאלות בעברית או באנגלית על המסמכים שהועלו.</p></div>',
         unsafe_allow_html=True,
     )
 
     if not st.session_state.extracted_policies:
-        st.warning("לא נמצאו פוליסות. העלה קבצים בלשונית הראשונה כדי להתחיל שיחה.")
+        st.warning("לא נמצאו מסמכים. העלה קבצים בלשונית הראשונה כדי להתחיל שיחה.")
     else:
         # Chat header
         st.markdown(
-            '<div class="chat-header">שאל שאלה על הפוליסות שלך</div>',
+            '<div class="chat-header">שאל שאלה על המסמכים שלך</div>',
             unsafe_allow_html=True,
         )
 

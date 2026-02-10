@@ -160,7 +160,8 @@ def compare_policies(req: func.HttpRequest) -> func.HttpResponse:
 
     def policy_label(policy: Dict[str, Any], index: int) -> str:
         policy_number = policy.get("policy_number") or f"policy_{index + 1}"
-        carrier = policy.get("carrier", {}).get("name")
+        carrier_obj = policy.get("carrier", {})
+        carrier = carrier_obj.get("name") if isinstance(carrier_obj, dict) else None
         return f"{policy_number} ({carrier})" if carrier else policy_number
 
     def coverage_premium(coverage: Dict[str, Any]) -> float:
@@ -190,11 +191,12 @@ def compare_policies(req: func.HttpRequest) -> func.HttpResponse:
         # If total_monthly_premium not set, calculate from coverages
         if not total_premium and policy.get("coverages"):
             total_premium = sum(coverage_premium(c) for c in policy["coverages"] if isinstance(c, dict))
+        carrier_obj = policy.get("carrier", {})
         summary.append(
             {
                 "policy": label,
                 "policy_number": policy.get("policy_number"),
-                "carrier": policy.get("carrier", {}).get("name"),
+                "carrier": carrier_obj.get("name") if isinstance(carrier_obj, dict) else None,
                 "total_monthly_premium": float(total_premium or 0),
             }
         )

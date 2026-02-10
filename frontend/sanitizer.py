@@ -66,11 +66,14 @@ def mask_email(email: str) -> str:
 # ---------------------------------------------------------------------------
 
 _ID_KEYS = frozenset({"id_number", "identity_number"})
-_PERSON_PARENTS = frozenset({"policyholder", "agent", "insured", "insured_person"})
+_PERSON_PARENTS = frozenset({
+    "policyholder", "agent", "insured", "insured_person",
+    "from_party", "to_party",
+})
 _NAME_KEYS = frozenset({"name", "full_name", "name_en"})
 _MEMBER_NAME_KEYS = frozenset({"member_name"})
 _ADDRESS_KEYS = frozenset({"address", "full_address"})
-_PHONE_KEYS = frozenset({"phone", "phone_number", "mobile"})
+_PHONE_KEYS = frozenset({"phone", "phone_number", "mobile", "fax"})
 _EMAIL_KEYS = frozenset({"email"})
 
 
@@ -120,10 +123,14 @@ def _sanitize_list(data: list, parent_key: str = "") -> list:
 
 
 def sanitize_policy(policy: Dict[str, Any]) -> Dict[str, Any]:
-    """Return a deep copy of *policy* with all PII fields masked."""
+    """Return a deep copy of *policy* (or any document) with all PII fields masked."""
     return _sanitize_dict(copy.deepcopy(policy))
 
 
+# Alias for use with any document type (invoices, receipts, etc.)
+sanitize_document = sanitize_policy
+
+
 def sanitize_policies(policies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Sanitize every policy in a list."""
+    """Sanitize every policy/document in a list."""
     return [sanitize_policy(p) for p in policies]

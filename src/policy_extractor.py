@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 from openai import AzureOpenAI, RateLimitError, APITimeoutError
 
 from src.policy_schema import PolicyDocument
+from src.document_helpers import detect_document_type
 
 EXTRACTION_SYSTEM_PROMPT = """
 You are an expert Israeli insurance document analyst. Extract ALL data from the policy into structured JSON.
@@ -37,6 +38,76 @@ Coverage types mapping:
 """
 
 
+MULTI_DOC_EXTRACTION_SYSTEM_PROMPT = """
+You are an expert financial document analyst specialising in Israeli documents.
+Extract ALL data from the document into structured JSON.
+
+First, identify what type of document this is:
+- Insurance policy (פוליסת ביטוח)
+- Invoice (חשבונית)
+- Receipt (קבלה)
+- Quote / estimate (הצעת מחיר)
+- Purchase order (הזמנת רכש)
+- Tax document / credit note (מסמך מס / חשבונית זיכוי)
+
+Then extract the relevant fields.
+
+For ALL documents, extract:
+- document_type: one of "policy", "invoice", "receipt", "quote", "purchase_order", "tax_document"
+- document_number: the main identifying number
+- document_date: the date on the document (ISO format YYYY-MM-DD)
+- from_party: object with name, address, phone, fax, email (the issuer/supplier)
+- to_party: object with name, address, phone, email (the recipient/customer)
+- total: the final total amount
+- currency: default "ILS" unless stated otherwise
+
+For INVOICES specifically, also extract:
+- line_items: array of objects with item_number, code, description, quantity, unit_price, total
+- subtotal: sum before tax/discount
+- discount: discount amount (negative if shown as reduction)
+- tax: VAT/מע"מ amount
+- po_number: purchase order reference if present
+- delivery_date: delivery/shipping date if present
+- payment_terms: payment terms if stated
+
+For RECEIPTS specifically, also extract:
+- payment_method: cash, credit card, bank transfer, etc.
+
+For QUOTES specifically, also extract:
+- payment_terms
+- line_items (same as invoices)
+
+For INSURANCE POLICIES specifically, also extract:
+- policy_number
+- carrier: object with name, name_en, phone, website, email
+- policyholder: object with name, name_en, id_number, date_of_birth, age, gender, email, address
+- effective_dates: object with print_date, renewal_date, index_date
+- coverages: array of objects with type, type_en, product_name, appendix_number, coverage_amount, period, premium
+- exclusions: array of objects with coverage, appendix, conditions
+- premium_projections: array of objects with coverage, appendix, projections
+- total_monthly_premium
+- payment: object with method, frequency
+- agent: object with name, phone, license, address
+- special_conditions: array of strings
+
+Insurance companies mapping:
+- פניקס / fnx = Phoenix (Fenix)
+- הראל = Harel
+- מגדל = Migdal
+- כלל = Clal
+- מנורה = Menora
+
+Coverage types mapping:
+- מחלות קשות = Critical Illness
+- ניתוחים = Surgeries
+- תרופות = Medications
+- השתלות = Transplants
+- אמבולטורי = Ambulatory Services
+
+Return valid JSON. Use ISO dates. Preserve Hebrew text as-is.
+"""
+
+
 def _extract_json_from_text(text: str) -> Dict[str, Any]:
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
@@ -58,28 +129,19 @@ def analyze_document_text(doc_client, content: bytes) -> Tuple[str, int]:
     return "\n\n".join(content_parts).strip(), pages_processed
 
 
-def run_gpt_extraction(
+def _call_gpt(
     client: AzureOpenAI,
     deployment: str,
-    document_text: str,
-    source_language: str,
+    system_prompt: str,
+    user_prompt: str,
 ) -> Dict[str, Any]:
-    schema_hint = PolicyDocument.model_json_schema()
-    user_prompt = (
-        "Extract the policy into this JSON schema. Use ISO dates. "
-        "Return only valid JSON.\n\n"
-        f"Schema: {json.dumps(schema_hint, ensure_ascii=False)}\n\n"
-        f"Source language: {source_language}\n\n"
-        "Document text:\n"
-        f"{document_text}"
-    )
-
+    """Send a chat completion request and parse the JSON response."""
     try:
         response = client.chat.completions.create(
             model=deployment,
             temperature=0,
             messages=[
-                {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
         )
@@ -96,6 +158,42 @@ def run_gpt_extraction(
 
     raw = response.choices[0].message.content
     return _extract_json_from_text(raw)
+
+
+def run_gpt_extraction(
+    client: AzureOpenAI,
+    deployment: str,
+    document_text: str,
+    source_language: str,
+) -> Dict[str, Any]:
+    schema_hint = PolicyDocument.model_json_schema()
+    user_prompt = (
+        "Extract the policy into this JSON schema. Use ISO dates. "
+        "Return only valid JSON.\n\n"
+        f"Schema: {json.dumps(schema_hint, ensure_ascii=False)}\n\n"
+        f"Source language: {source_language}\n\n"
+        "Document text:\n"
+        f"{document_text}"
+    )
+    return _call_gpt(client, deployment, EXTRACTION_SYSTEM_PROMPT, user_prompt)
+
+
+def run_gpt_document_extraction(
+    client: AzureOpenAI,
+    deployment: str,
+    document_text: str,
+    source_language: str,
+) -> Dict[str, Any]:
+    """Run GPT extraction using the multi-document-type prompt."""
+    user_prompt = (
+        "Extract all information from this financial document into JSON. "
+        "First identify the document type, then extract all relevant fields. "
+        "Use ISO dates. Return only valid JSON.\n\n"
+        f"Source language: {source_language}\n\n"
+        "Document text:\n"
+        f"{document_text}"
+    )
+    return _call_gpt(client, deployment, MULTI_DOC_EXTRACTION_SYSTEM_PROMPT, user_prompt)
 
 
 def extract_policy(
@@ -122,4 +220,49 @@ def extract_policy(
     extracted["metadata"]["pages_processed"] = pages_processed
 
     model = PolicyDocument.model_validate(extracted)
-    return model.model_dump(mode="json")
+    result = model.model_dump(mode="json")
+    # Tag as policy document type for downstream consumers
+    result["document_type"] = "policy"
+    return result
+
+
+def extract_document(
+    *,
+    doc_client,
+    openai_client: AzureOpenAI,
+    deployment: str,
+    content: bytes,
+    source_language: str,
+) -> Dict[str, Any]:
+    """Extract any financial document type (invoice, receipt, quote, policy, etc.).
+
+    Uses the multi-document prompt to identify the type and extract fields.
+    For documents detected as policies, validates against PolicyDocument schema.
+    """
+    document_text, pages_processed = analyze_document_text(doc_client, content)
+    if not document_text:
+        raise ValueError("No text extracted from document")
+
+    extracted = run_gpt_document_extraction(
+        client=openai_client,
+        deployment=deployment,
+        document_text=document_text,
+        source_language=source_language,
+    )
+
+    # Ensure document_type is set
+    doc_type = detect_document_type(extracted)
+    extracted["document_type"] = doc_type
+
+    extracted.setdefault("metadata", {})
+    extracted["metadata"]["source_language"] = source_language
+    extracted["metadata"]["pages_processed"] = pages_processed
+
+    # For policies, validate against the strict Pydantic schema
+    if doc_type == "policy":
+        model = PolicyDocument.model_validate(extracted)
+        result = model.model_dump(mode="json")
+        result["document_type"] = "policy"
+        return result
+
+    return extracted
