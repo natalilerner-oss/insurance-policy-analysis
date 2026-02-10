@@ -27,7 +27,7 @@ from src.azure_clients import (
     get_openai_client,
 )
 from src.hebrew_utils import contains_hebrew
-from src.policy_extractor import extract_policy
+from src.policy_extractor import extract_policy, extract_document
 from src.job_store import save_job, load_job
 from src.blueprints.utils import assign_request_id, error_response, verify_jwt, logger, get_memory_info, get_request_id
 
@@ -148,7 +148,7 @@ def _run_extraction(job_id: str, content: bytes) -> None:
         sample_text, _ = doc_client.begin_analyze_document("prebuilt-document", content).result(), None
         source_language = _detect_language(sample_text.content if sample_text else "")
 
-        result = extract_policy(
+        result = extract_document(
             doc_client=doc_client,
             openai_client=openai_client,
             deployment=deployment,
@@ -305,7 +305,7 @@ def extract_policy_sync(req: func.HttpRequest) -> func.HttpResponse:
         preview = doc_client.begin_analyze_document("prebuilt-document", content).result()
         source_language = _detect_language(preview.content if preview else "")
 
-        result = extract_policy(
+        result = extract_document(
             doc_client=doc_client,
             openai_client=openai_client,
             deployment=deployment,

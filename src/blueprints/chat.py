@@ -6,6 +6,7 @@ import azure.functions as func
 
 from src.azure_clients import get_openai_client
 from src.hebrew_utils import contains_hebrew
+from src.document_helpers import detect_document_type, get_party_name, get_issuer_name, get_document_number, get_total_amount
 from src.blueprints.utils import assign_request_id, error_response, verify_jwt, logger, get_request_id
 
 bp = func.Blueprint()
@@ -15,8 +16,8 @@ CHAT_MODEL = os.environ.get("AZURE_OPENAI_CHAT_MODEL", os.environ.get("AZURE_OPE
 CHAT_MAX_TOKENS = int(os.environ.get("CHAT_MAX_TOKENS", "1000"))
 CHAT_TEMPERATURE = float(os.environ.get("CHAT_TEMPERATURE", "0.7"))
 
-SYSTEM_PROMPT = """You are a helpful insurance policy assistant for PolicyLens, a system that manages Israeli insurance policies.
-You help users understand their insurance policies in both Hebrew and English.
+SYSTEM_PROMPT = """You are a helpful financial document assistant for PolicyLens, a system that manages Israeli financial documents including insurance policies, invoices, receipts, quotes, and more.
+You help users understand their documents in both Hebrew and English.
 
 IMPORTANT RULES:
 1. Always mask sensitive information in your responses:
@@ -24,59 +25,104 @@ IMPORTANT RULES:
    - Use first name + initial for last names (e.g., נטלי ק.)
    - Never show full addresses
    - Mask phone numbers showing only last 4 digits
-2. Answer based ONLY on the policy data provided in the context.
+2. Answer based ONLY on the document data provided in the context.
 3. If the user asks about something not in the provided data, say you don't have that information.
 4. Respond in the same language the user uses (Hebrew or English).
 5. Use currency symbol ₪ for Israeli Shekel amounts.
 6. Be concise but thorough in your answers.
+7. When referring to documents, use the correct type (policy, invoice, receipt, etc.).
 """
 
 
 def _build_policy_context(policies: List[Dict[str, Any]]) -> str:
-    """Build a summarized context string from policy data for the LLM."""
+    """Build a summarized context string from document data for the LLM."""
     if not policies:
-        return "No policies loaded."
+        return "No documents loaded."
 
     parts = []
-    for i, policy in enumerate(policies, 1):
-        lines = [f"--- Policy {i} ---"]
-        lines.append(f"Policy Number: {policy.get('policy_number', 'N/A')}")
+    for i, doc in enumerate(policies, 1):
+        doc_type = doc.get("document_type", detect_document_type(doc))
 
-        carrier = policy.get("carrier", {})
-        if isinstance(carrier, dict):
-            lines.append(f"Carrier: {carrier.get('name', 'N/A')}")
+        if doc_type == "policy":
+            lines = [f"--- Policy {i} ---"]
+            lines.append(f"Document Type: Insurance Policy")
+            lines.append(f"Policy Number: {doc.get('policy_number', 'N/A')}")
 
-        holder = policy.get("policyholder", {})
-        if isinstance(holder, dict):
-            lines.append(f"Policyholder: {holder.get('name', 'N/A')}")
-            if holder.get("date_of_birth"):
-                lines.append(f"Date of Birth: {holder['date_of_birth']}")
+            carrier = doc.get("carrier", {})
+            if isinstance(carrier, dict):
+                lines.append(f"Carrier: {carrier.get('name', 'N/A')}")
 
-        lines.append(f"Total Monthly Premium: {policy.get('total_monthly_premium', 'N/A')}")
+            holder = doc.get("policyholder", {})
+            if isinstance(holder, dict):
+                lines.append(f"Policyholder: {holder.get('name', 'N/A')}")
+                if holder.get("date_of_birth"):
+                    lines.append(f"Date of Birth: {holder['date_of_birth']}")
 
-        coverages = policy.get("coverages", [])
-        if coverages:
-            lines.append("Coverages:")
-            for cov in coverages:
-                if not isinstance(cov, dict):
-                    continue
-                cov_type = cov.get("type") or cov.get("product_name") or "Unknown"
-                premium = cov.get("premium", {})
-                if isinstance(premium, dict):
-                    amount = premium.get("final_monthly") or premium.get("base_monthly") or 0
-                else:
-                    amount = premium or 0
-                lines.append(f"  - {cov_type}: ₪{amount}")
+            lines.append(f"Total Monthly Premium: {doc.get('total_monthly_premium', 'N/A')}")
 
-        exclusions = policy.get("exclusions", [])
-        if exclusions:
-            lines.append("Exclusions:")
-            for exc in exclusions:
-                if isinstance(exc, dict):
-                    conditions = ", ".join(exc.get("conditions", []))
-                    lines.append(f"  - {exc.get('coverage', '')}: {conditions}")
+            coverages = doc.get("coverages", [])
+            if coverages:
+                lines.append("Coverages:")
+                for cov in coverages:
+                    if not isinstance(cov, dict):
+                        continue
+                    cov_type = cov.get("type") or cov.get("product_name") or "Unknown"
+                    premium = cov.get("premium", {})
+                    if isinstance(premium, dict):
+                        amount = premium.get("final_monthly") or premium.get("base_monthly") or 0
+                    else:
+                        amount = premium or 0
+                    lines.append(f"  - {cov_type}: ₪{amount}")
 
-        source = policy.get("_source_file")
+            exclusions = doc.get("exclusions", [])
+            if exclusions:
+                lines.append("Exclusions:")
+                for exc in exclusions:
+                    if isinstance(exc, dict):
+                        conditions = ", ".join(exc.get("conditions", []))
+                        lines.append(f"  - {exc.get('coverage', '')}: {conditions}")
+
+        else:
+            # Non-policy document (invoice, receipt, quote, etc.)
+            type_map = {
+                "invoice": "Invoice",
+                "receipt": "Receipt",
+                "quote": "Quote",
+                "purchase_order": "Purchase Order",
+                "tax_document": "Tax Document",
+            }
+            type_label = type_map.get(doc_type, "Document")
+            lines = [f"--- {type_label} {i} ---"]
+            lines.append(f"Document Type: {type_label}")
+            lines.append(f"Document Number: {get_document_number(doc)}")
+            lines.append(f"Date: {doc.get('document_date', 'N/A')}")
+            lines.append(f"Issuer: {get_issuer_name(doc)}")
+            lines.append(f"Recipient: {get_party_name(doc)}")
+            lines.append(f"Total: ₪{get_total_amount(doc):,.2f}")
+
+            line_items = doc.get("line_items", [])
+            if line_items:
+                lines.append("Line Items:")
+                for item in line_items:
+                    if not isinstance(item, dict):
+                        continue
+                    desc = item.get("description", "Unknown")
+                    qty = item.get("quantity", "")
+                    total = item.get("total", 0)
+                    lines.append(f"  - {desc} (qty: {qty}) ₪{total}")
+
+            if doc.get("subtotal") is not None:
+                lines.append(f"Subtotal: ₪{doc['subtotal']}")
+            if doc.get("tax") is not None:
+                lines.append(f"Tax/VAT: ₪{doc['tax']}")
+            if doc.get("discount") is not None:
+                lines.append(f"Discount: ₪{doc['discount']}")
+            if doc.get("po_number"):
+                lines.append(f"PO Number: {doc['po_number']}")
+            if doc.get("payment_terms"):
+                lines.append(f"Payment Terms: {doc['payment_terms']}")
+
+        source = doc.get("_source_file")
         if source:
             lines.append(f"Source File: {source}")
 
