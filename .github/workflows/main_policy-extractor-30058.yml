@@ -53,6 +53,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      contents: none
     
     steps:
       - name: Download artifact from build job
