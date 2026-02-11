@@ -2,13 +2,27 @@
 
 These utilities provide a uniform interface regardless of whether the
 document is an insurance policy, invoice, receipt, quote, etc.
+
+This module intentionally avoids importing from ``document_schema``
+(which depends on pydantic) so that lightweight consumers such as the
+Streamlit frontend can use these helpers without heavy dependencies.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from src.document_schema import DOCUMENT_TYPE_LABELS_HE
+# Hebrew UI labels – kept here (not in document_schema) to avoid pulling
+# in pydantic for frontend-only usage.
+DOCUMENT_TYPE_LABELS_HE: Dict[str, str] = {
+    "policy": "פוליסה",
+    "invoice": "חשבונית",
+    "receipt": "קבלה",
+    "quote": "הצעת מחיר",
+    "purchase_order": "הזמנת רכש",
+    "tax_document": "מסמך מס",
+    "document": "מסמך",
+}
 
 
 # ---------------------------------------------------------------------------

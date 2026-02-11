@@ -26,15 +26,10 @@ DOCUMENT_TYPES = (
     "document",  # generic fallback
 )
 
-DOCUMENT_TYPE_LABELS_HE = {
-    "policy": "פוליסה",
-    "invoice": "חשבונית",
-    "receipt": "קבלה",
-    "quote": "הצעת מחיר",
-    "purchase_order": "הזמנת רכש",
-    "tax_document": "מסמך מס",
-    "document": "מסמך",
-}
+# Hebrew labels are defined in document_helpers to avoid circular imports
+# and to keep this module free from lightweight-consumer dependencies.
+# Re-export here for backward compatibility.
+from src.document_helpers import DOCUMENT_TYPE_LABELS_HE  # noqa: F401
 
 
 # ---------------------------------------------------------------------------
